@@ -36,9 +36,16 @@ jobs:
         run: npm run build
 
       - name: Configure GitHub Pages
+        id: pages
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
+      - name: Write custom domain (if configured)
+        run: |
+          if [ -n "${{ steps.pages.outputs.cname }}" ]; then
+            echo "${{ steps.pages.outputs.cname }}" > dist/CNAME
+          fi
 
       - name: Upload build artifact
         uses: actions/upload-pages-artifact@v3
