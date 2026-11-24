@@ -793,15 +793,20 @@ export function App() {
                   >
                     Form Type
                   </label>
-                  <select
+                  <SearchableSelect
                     id="formTypeSelect"
+                    options={[
+                      {
+                        value: 'BEFTN',
+                        label: 'BEFTN (Outward Credit)',
+                        keywords: 'beftn outward credit',
+                      },
+                      { value: 'RTGS', label: 'RTGS Application', keywords: 'rtgs' },
+                    ]}
                     value={formType}
-                    onChange={(e) => setActivePage(e.target.value as FormType)}
-                    className="w-full px-2.5 py-2 text-sm bg-white border border-[#BFCAC4] rounded focus:outline-none focus:ring-2 focus:ring-[#006633]/30 focus:border-[#006633]"
-                  >
-                    <option value="BEFTN">BEFTN (Outward Credit)</option>
-                    <option value="RTGS">RTGS Application</option>
-                  </select>
+                    onChange={(val) => setActivePage(val as FormType)}
+                    placeholder="Form Type সিলেক্ট করুন..."
+                  />
                 </div>
 
                 <div className="sm:col-span-8">
