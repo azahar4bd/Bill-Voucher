@@ -1,0 +1,6 @@
+{
+  "name": "Sonali Bank BEFTN & RTGS Form Studio",
+  "description": "BEFTN and RTGS fund transfer form entry and pixel-accurate A4 PDF print application for Bandhu Kallyan Foundation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

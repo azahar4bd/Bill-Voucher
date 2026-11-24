@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonali Bank - BEFTN / RTGS Form Entry App</title>
+<meta name="theme-color" content="#006633">
+<meta name="description" content="Sonali Bank BEFTN/RTGS Form Entry App - Bandhu Kallyan Foundation">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef2f5; color: #222; padding: 12px; }
+  .card { background: #fff; border: 1px solid #cfd8dc; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .card h3 { font-size: 14px; color: #006633; margin-bottom: 10px; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .field { display: flex; align-items: center; gap: 6px; }
+  .field label { font-size: 13px; white-space: nowrap; color: #333; }
+  input[type=text], select { padding: 6px 8px; border: 1px solid #bbb; border-radius: 4px; font-size: 13px; }
+  input:focus, select:focus { outline: 2px solid #006633; border-color: #006633; }
+  .w-sm { width: 150px; } .w-md { width: 210px; } .w-lg { width: 300px; } .w-xl { width: 360px; }
+  button { padding: 7px 14px; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn-green { background: #006633; color: #fff; }
+  .btn-green:hover { background: #004d26; }
+  .btn-blue { background: #1565c0; color: #fff; }
+  .btn-blue:hover { background: #0d47a1; }
+  .btn-grey { background: #eceff1; color: #333; border: 1px solid #b0bec5; }
+  .btn-grey:hover { background: #cfd8dc; }
+  .btn-red { background: #c62828; color: #fff; }
+  .btn-red:hover { background: #8e0000; }
+  .btn-orange { background: #ef6c00; color: #fff; }
+  .btn-orange:hover { background: #e65100; }
+  #ackPreview { background: #f8f9fa; border: 1px dashed #90a4ae; border-radius: 5px; padding: 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+  .tip { font-size: 12px; color: #666; }
+  .header-bar { background: #006633; color: #fff; padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .header-bar h1 { font-size: 17px; }
+  .header-bar span { font-size: 12px; opacity: 0.9; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #006633; color: #fff; padding: 12px 18px; border-radius: 6px; font-size: 14px; display: none; z-index: 999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .install-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; font-size: 13px; }
+  .install-box b { color: #e65100; }
+
+  /* ===== PRINT: Exact Sonali Bank form layout (flex dotted lines) ===== */
+  #printArea { display: none; }
+  @media print {
+    body { margin: 0; padding: 0; background: #fff; }
+    body > *:not(#printArea) { display: none !important; }
+    #printArea { display: block !important; position: static; width: 100%; font-family: Arial, Helvetica, sans-serif; color: #000; }
+    @page { size: A4; margin: 12mm 20mm; }
+  }
+  #printArea .p-top { position: relative; text-align: center; margin-bottom: 2px; }
+  #printArea .p-top img { width: 320px; }
+  #printArea .p-sys { position: absolute; right: 0; top: 0; border: 1px solid #bbb; padding: 12px 18px; font-size: 9px; text-align: center; color: #333; }
+  #printArea .p-sys .line { border-top: 1px solid #333; width: 150px; margin: 0 auto 6px; }
+  #printArea .p-title { text-align: center; font-size: 15px; font-weight: bold; text-decoration: underline; margin: 6px 0 14px; }
+  #printArea .p-line { font-size: 10px; margin: 6px 0; line-height: 1.6; }
+  #printArea .p-row { display: flex; align-items: baseline; gap: 5px; font-size: 10px; margin: 6px 0; line-height: 1.6; }
+  #printArea .p-row .lbl { white-space: nowrap; }
+  #printArea .p-row .blue { white-space: nowrap; }
+  #printArea .p-row .dot { flex: 1; min-width: 20px; height: 8px; background-image: radial-gradient(circle, #555 0.55px, transparent 0.65px); background-size: 3.5px 2px; background-repeat: repeat-x; background-position: bottom; }
+  #printArea .blue { color: #0000CD; font-family: 'Segoe Print', 'Comic Sans MS', 'Bradley Hand', cursive; }
+  #printArea .p-sec { font-weight: bold; text-decoration: underline; margin: 14px 0 6px; font-size: 10.5px; }
+  #printArea .p-bankuse-title { text-align: center; font-weight: bold; text-decoration: underline; font-size: 10px; margin: 14px 0 6px; }
+  #printArea .p-box { border: 1px dashed #000; margin: 4px 0 12px; }
+  #printArea .p-box table { width: 100%; border-collapse: collapse; }
+  #printArea .p-box td { width: 50%; text-align: center; font-size: 9px; padding: 44px 6px 34px; vertical-align: top; }
+  #printArea .p-box td:first-child { border-right: 1px dashed #000; }
+  #printArea .p-box .sigline { border-top: 1px solid #000; width: 55%; margin: 44px auto 6px; }
+  #printArea .p-cross { font-size: 10px; color: #555; letter-spacing: 1px; margin: 16px 0 18px; white-space: nowrap; overflow: hidden; }
+  #printArea .p-ack { border: 1.5px solid #000; padding: 20px 16px; margin-top: 18px; font-size: 10px; }
+  #printArea .p-ack h3 { text-align: center; text-decoration: underline; font-size: 11px; margin-bottom: 12px; }
+  #printArea .p-ack .p-row { font-size: 9px; flex-wrap: wrap; row-gap: 2px; }
+  #printArea .p-sigrow { display: flex; justify-content: space-between; margin-top: 44px; font-size: 9px; }
+  #printArea .p-sigrow .s { width: 38%; text-align: center; }
+  #printArea .p-sigrow .s .ln { border-top: 1px solid #000; margin-bottom: 4px; }
+  #printArea .p-sigline-right { width: 42%; margin-left: auto; text-align: center; font-size: 9px; }
+  #printArea .p-sigline-right .ln { border-top: 1px solid #000; margin-bottom: 4px; }
+  #printArea.rtgs .p-top img { width: 260px; }
+  #printArea.rtgs .p-row { margin: 5px 0; }
+  #printArea.rtgs .p-sec { margin: 10px 0 5px; }
+  #printArea.rtgs .p-bankuse-title { margin: 10px 0 5px; }
+  #printArea.rtgs .p-box td { padding: 20px 6px 15px; }
+  #printArea.rtgs .p-box .sigline { margin: 18px auto 5px; }
+  #printArea.rtgs .p-ack { padding: 13px 12px; margin-top: 12px; }
+  #printArea.rtgs .p-sigrow { margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<div class="header-bar">
+  <h1>🏦 Sonali Bank Limited — BEFTN / RTGS Form Entry App</h1>
+  <span>Bandhu Kallyan Foundation</span>
+</div>
+
+<div class="install-box">
+  <b>🖥️ PC-তে ইনস্টল করতে:</b> Chrome/Edge ব্রাউজারে এই পেজ খুলে উপরের ডানদিকে <b>⋮ (তিন ডট)</b> মেনু → <b>"Install app"</b> বা <b>"Create shortcut"</b> → ডেস্কটপে আইকন তৈরি হবে। তারপর আইকনে ক্লিক করলেই অ্যাপ খুলবে — Python লাগবে না!
+</div>
+
+<!-- TOP SELECTION -->
+<div class="card">
+  <h3>উপরে সিলেকশন (Top Selection)</h3>
+  <div class="row">
+    <div class="field"><label>Form Type:</label>
+      <select id="formType" class="w-sm">
+        <option value="BEFTN">BEFTN</option>
+        <option value="RTGS">RTGS</option>
+      </select>
+    </div>
+    <div class="field"><label>Saved Bank Profile:</label>
+      <select id="profileSelect" class="w-xl"></select>
+    </div>
+    <button class="btn-blue" id="btnNew">＋ New Entry</button>
+    <button class="btn-grey" id="btnClear">Clear</button>
+  </div>
+  <div class="row">
+    <div class="field"><label>Profile Name:</label>
+      <input type="text" id="profileName" class="w-md" placeholder="যেমন: Dutch Bangla - Uttara">
+    </div>
+    <button class="btn-green" id="btnSaveNew">💾 Save as New Bank</button>
+    <button class="btn-orange" id="btnUpdate">✏️ Update Selected</button>
+    <button class="btn-red" id="btnDelete">🗑 Delete</button>
+  </div>
+  <div class="tip">💡 ব্যাংক সিলেক্ট করলেই নিচের সব ঘর অটো পূরণ হবে। নতুন ব্যাংক যোগ করতে Receiver ঘর পূরণ করে "Save as New Bank" চাপুন। সেভ করা ব্যাংক এই ব্রাউজারেই সেভ থাকে।</div>
+</div>
+
+<!-- SENDER -->
+<div class="card">
+  <h3>Sender Details (প্রেরকের তথ্য)</h3>
+  <div class="row">
+    <div class="field"><label>Date (DD-MM-YYYY):</label><input type="text" id="date" class="w-sm"></div>
+    <div class="field"><label>Branch:</label><input type="text" id="branch" class="w-md"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Account Number:</label><input type="text" id="senderAcct" class="w-md"></div>
+    <div class="field"><label>Account Title:</label><input type="text" id="senderTitle" class="w-lg"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Amount (Tk):</label><input type="text" id="amount" class="w-sm" placeholder="যেমন: 2000"></div>
+    <div class="field"><label>Amount in Words:</label><input type="text" id="amountWords" class="w-lg"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Cheque No:</label><input type="text" id="cheque" class="w-sm"></div>
+    <div class="field"><label>Mobile No:</label><input type="text" id="mobile" class="w-md"></div>
+    <div class="field"><label>Branch Name:</label><input type="text" id="branchName" class="w-md"></div>
+  </div>
+</div>
+
+<!-- RECEIVER -->
+<div class="card">
+  <h3>Receiver's Details (প্রাপকের তথ্য) — ব্যাংক সিলেক্ট করলে অটো পূরণ হবে</h3>
+  <div class="row">
+    <div class="field"><label>Receiving Bank:</label><input type="text" id="recvBank" class="w-md"></div>
+    <div class="field"><label>District:</label><input type="text" id="district" class="w-sm"></div>
+    <div class="field"><label>Receiving Branch:</label><input type="text" id="recvBranch" class="w-md"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Routing Number:</label><input type="text" id="routing" class="w-md"></div>
+    <div class="field"><label>Receiver Account No:</label><input type="text" id="recvAcct" class="w-md"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Receiver Name:</label><input type="text" id="recvName" class="w-lg"></div>
+    <div class="field"><label>Receiver Mobile:</label><input type="text" id="recvMobile" class="w-sm"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Receiver Amount:</label><input type="text" id="recvAmount" class="w-sm"></div>
+    <div class="field"><label>Amount in Words:</label><input type="text" id="recvWords" class="w-lg"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Purpose:</label><input type="text" id="purpose" class="w-lg"></div>
+  </div>
+</div>
+
+<!-- ACK PREVIEW -->
+<div class="card">
+  <h3>Acknowledgement Preview (লাইভ প্রিভিউ)</h3>
+  <div id="ackPreview"></div>
+</div>
+
+<div class="row" style="justify-content: space-between;">
+  <div>
+    <button class="btn-green" id="btnPdf" style="font-size:15px; padding:10px 22px;">🖨️ Print / Save as PDF</button>
+  </div>
+  <div class="tip">Print বাটনে ক্লিক করে "Save as PDF" সিলেক্ট করলেই Sonali Bank ফর্মের মতো PDF পাবেন।</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- PRINT AREA (hidden, only for printing) -->
+<div id="printArea"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+const DEFAULT_PROFILES = [
+  { name: 'Bank Asia PLC - Khulna Branch', receiving_bank: 'Bank Asia PLC', district: 'Khulna', receiving_branch: 'Khulna Branch', routing_number: '070471548', receiver_account_number: '0002536000048', receiver_name: 'Bandhu Kallyan Foundation', receiver_mobile: '', purpose: 'Fund Transfer' },
+  { name: 'Bank Asia PLC - Boro Bazar, Khulna (Gratuity)', receiving_bank: 'Bank Asia PLC', district: 'Khulna', receiving_branch: 'Boro Bazar, Khulna', routing_number: '070472163', receiver_account_number: '0015636000143', receiver_name: 'Bandhu Kallyan Foundation -Gratuity', receiver_mobile: '', purpose: 'Gratuity Fund Transfer' },
+  { name: 'UCBL PLC - Noapara, Jessore (PF)', receiving_bank: 'UCBL PLC', district: 'Jessore', receiving_branch: 'Noapara', routing_number: '245411667', receiver_account_number: '0592112000001077', receiver_name: 'Bandhu Kallyan Foundation P F', receiver_mobile: '', purpose: 'PF Fund Transfer' }
+];
+const DEFAULT_SENDER = { branch: 'Gobra', account_number: '2502333001396', account_title: 'Bandhu Kallyan Foundation', cheque_no: '', mobile_no: '01720597579', branch_name: 'Gobra' };
+
+let profiles = [];
+try { profiles = JSON.parse(localStorage.getItem('bankProfiles')) || DEFAULT_PROFILES; }
+catch(e) { profiles = DEFAULT_PROFILES; }
+
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+function twoDigits(n) { if (n < 20) return ONES[n]; return TENS[Math.floor(n/10)] + (n%10 ? ' ' + ONES[n%10] : ''); }
+function threeDigits(n) { const h = Math.floor(n/100), r = n%100, p = []; if (h) p.push(ONES[h]+' hundred'); if (r) p.push(twoDigits(r)); return p.join(' '); }
+function numberToWords(num) {
+  num = parseInt(String(num).replace(/,/g,'').trim(), 10);
+  if (isNaN(num)) return '';
+  if (num === 0) return 'Zero';
+  const p = [];
+  const cr = Math.floor(num/10000000); num %= 10000000;
+  const lk = Math.floor(num/100000); num %= 100000;
+  const th = Math.floor(num/1000); num %= 1000;
+  if (cr) p.push(twoDigits(cr)+' crore');
+  if (lk) p.push(twoDigits(lk)+' lakh');
+  if (th) p.push(twoDigits(th)+' thousand');
+  if (num) p.push(threeDigits(num));
+  return p.join(' ');
+}
+function amountInWords(a) { const w = numberToWords(a); if (!w) return ''; return w.split(' ').map(x => x.charAt(0).toUpperCase()+x.slice(1)).join(' ') + ' Taka Only'; }
+
+function showToast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
+function todayStr() { const d = new Date(); return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear(); }
+function saveProfiles() { localStorage.setItem('bankProfiles', JSON.stringify(profiles)); }
+function loadSenderDefaults() {
+  $('branch').value = DEFAULT_SENDER.branch;
+  $('senderAcct').value = DEFAULT_SENDER.account_number;
+  $('senderTitle').value = DEFAULT_SENDER.account_title;
+  $('cheque').value = DEFAULT_SENDER.cheque_no;
+  $('mobile').value = DEFAULT_SENDER.mobile_no;
+  $('branchName').value = DEFAULT_SENDER.branch_name;
+}
+function refreshDropdown(selectName) {
+  const sel = $('profileSelect'); sel.innerHTML = '';
+  profiles.forEach(p => { const o = document.createElement('option'); o.value = p.name; o.textContent = p.name; sel.appendChild(o); });
+  if (selectName) sel.value = selectName; else if (profiles.length) sel.value = profiles[0].name;
+}
+function onProfileSelect() {
+  const p = profiles.find(x => x.name === $('profileSelect').value);
+  if (!p) return;
+  $('recvBank').value = p.receiving_bank || '';
+  $('district').value = p.district || '';
+  $('recvBranch').value = p.receiving_branch || '';
+  $('routing').value = p.routing_number || '';
+  $('recvAcct').value = p.receiver_account_number || '';
+  $('recvName').value = p.receiver_name || '';
+  $('recvMobile').value = p.receiver_mobile || '';
+  $('purpose').value = p.purpose || '';
+  $('profileName').value = p.name;
+  updateAck();
+}
+function onAmountChange() {
+  const amt = $('amount').value.trim().replace(/,/g,'');
+  if (amt && /^\d+(\.\d+)?$/.test(amt)) {
+    const w = amountInWords(amt);
+    $('amountWords').value = w; $('recvAmount').value = amt; $('recvWords').value = w;
+  } else { $('amountWords').value = ''; $('recvWords').value = ''; }
+  updateAck();
+}
+function updateAck() {
+  const ft = $('formType').value, amt = $('amount').value.trim();
+  $('ackPreview').textContent =
+    `Dated: ${$('date').value}    |    Form: ${ft} Outward Application\n` +
+    `Acknowledge that Sonali Bank Limited, ${$('branch').value} Branch has debited Tk. ${amt ? amt+'/-' : '___'}\n` +
+    `(In words: ${$('amountWords').value || '___'}) from account number ${$('senderAcct').value} For ${ft} to\n` +
+    `Account number ${$('recvAcct').value} of ${$('recvBank').value} Bank of ${$('recvBranch').value} Branch.`;
+}
+function getReceiverData() {
+  return {
+    name: $('profileName').value.trim() || `${$('recvBank').value} - ${$('recvBranch').value}`,
+    receiving_bank: $('recvBank').value.trim(), district: $('district').value.trim(),
+    receiving_branch: $('recvBranch').value.trim(), routing_number: $('routing').value.trim(),
+    receiver_account_number: $('recvAcct').value.trim(), receiver_name: $('recvName').value.trim(),
+    receiver_mobile: $('recvMobile').value.trim(), purpose: $('purpose').value.trim()
+  };
+}
+
+$('profileSelect').addEventListener('change', onProfileSelect);
+$('formType').addEventListener('change', updateAck);
+$('amount').addEventListener('input', onAmountChange);
+['date','branch','senderAcct','recvBank','recvBranch','recvAcct'].forEach(id => $(id).addEventListener('input', updateAck));
+
+$('btnNew').addEventListener('click', () => {
+  $('date').value = todayStr();
+  ['amount','amountWords','recvAmount','recvWords','cheque'].forEach(id => $(id).value = '');
+  loadSenderDefaults(); updateAck(); showToast('নতুন এন্ট্রি তৈরি হয়েছে');
+});
+$('btnClear').addEventListener('click', () => {
+  ['amount','amountWords','recvAmount','recvWords','cheque','recvMobile'].forEach(id => $(id).value = '');
+  loadSenderDefaults(); updateAck();
+});
+$('btnSaveNew').addEventListener('click', () => {
+  const d = getReceiverData();
+  if (!d.receiving_bank || !d.receiver_account_number) { alert('Receiving Bank এবং Receiver Account Number অবশ্যই পূরণ করুন!'); return; }
+  if (profiles.some(p => p.name === d.name)) { alert('এই নামে ইতিমধ্যে প্রোফাইল আছে। Update Selected ব্যবহার করুন।'); return; }
+  profiles.push(d); saveProfiles(); refreshDropdown(d.name); onProfileSelect();
+  showToast(`'${d.name}' সেভ হয়েছে!`);
+});
+$('btnUpdate').addEventListener('click', () => {
+  const sel = $('profileSelect').value;
+  if (!sel) { alert('আগে ব্যাংক সিলেক্ট করুন।'); return; }
+  const d = getReceiverData();
+  const i = profiles.findIndex(p => p.name === sel);
+  if (i >= 0) profiles[i] = d;
+  saveProfiles(); refreshDropdown(d.name); onProfileSelect();
+  showToast('প্রোফাইল আপডেট হয়েছে!');
+});
+$('btnDelete').addEventListener('click', () => {
+  const sel = $('profileSelect').value;
+  if (!sel) return;
+  if (!confirm(`'${sel}' ডিলিট করবেন?`)) return;
+  profiles = profiles.filter(p => p.name !== sel);
+  saveProfiles(); refreshDropdown();
+  if (profiles.length) onProfileSelect();
+  showToast('ডিলিট হয়েছে।');
+});
+$('btnPdf').addEventListener('click', () => {
+  if (!$('amount').value.trim()) { alert('Amount অবশ্যই লিখুন!'); return; }
+  buildPrintArea();
+  window.print();
+});
+
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+const LOGO_URI = 'data:image/png;base64,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';
+function buildPrintArea() {
+  const ft = $('formType').value;
+  const title = ft === 'BEFTN' ? 'BEFTN Outward (Credit) Application Form' : 'RTGS Application Form';
+  const amtDisp = $('amount').value.trim() + '/-';
+  const rAmtDisp = ($('recvAmount').value.trim() || $('amount').value.trim()) + '/-';
+  const branchDisp = ft === 'RTGS' ? (esc($('recvBranch').value) + ',' + esc($('district').value)) : esc($('recvBranch').value);
+  const bankUse = ft === 'BEFTN'
+    ? '<div class="p-box"><table><tr><td><div class="sigline"></div>Account debited by<div class="sigline"></div>Authorized By</td><td><div class="sigline"></div>BEFTN Originated by<div class="sigline"></div>BEFTN verified by</td></tr></table></div>'
+    : '<div class="p-box"><table><tr><td><div class="sigline"></div>Originated by</td><td><div class="sigline"></div>Authorised by</td></tr></table></div>';
+  const midSection = ft === 'BEFTN'
+    ? '<div class="p-cross">..................&#10007;..................&#10007;..................&#10007;..................&#10007;..................&#10007;..................&#10007;..................</div>'
+    : '<div class="p-sigline-right"><div class="ln"></div>Signature of Account Holder(s)</div><p class="p-bankuse-title">For Bank\'s use only</p><div class="p-box"><table><tr><td><div class="sigline"></div>Originated by</td><td><div class="sigline"></div>Authorised by</td></tr></table></div><div class="p-sigline-right"><div class="ln"></div>Manager</div>';
+  const recvRow1 = ft === 'BEFTN'
+    ? '<div class="p-row"><span class="lbl">Receiving Bank :</span><span class="blue">' + esc($('recvBank').value) + '</span><span class="dot"></span><span class="lbl">District:</span><span class="blue">' + esc($('district').value) + '</span><span class="dot"></span><span class="lbl">Receiving Branch:</span><span class="blue">' + esc($('recvBranch').value) + '</span><span class="dot"></span></div>'
+    : '<div class="p-row"><span class="lbl">Receiving Bank :</span><span class="blue">' + esc($('recvBank').value) + '</span><span class="dot"></span><span class="lbl">Receiving Branch:</span><span class="blue">' + esc($('recvBranch').value) + '</span><span class="dot"></span><span class="lbl">District:</span><span class="blue">' + esc($('district').value) + '</span><span class="dot"></span></div>';
+  $('printArea').className = ft === 'RTGS' ? 'rtgs' : '';
+  $('printArea').innerHTML =
+    '<div class="p-top"><div class="p-sys"><div class="line"></div>Sys no. (Bank\'s use only)</div><img src="' + LOGO_URI + '" alt="Sonali Bank Limited"></div>' +
+    '<div class="p-title">' + title + '</div>' +
+    '<div class="p-row"><span class="lbl">Date:</span><span class="blue">' + esc($('date').value) + '</span><span class="dot"></span></div>' +
+    '<p class="p-line">The Manager,</p>' +
+    '<div class="p-row"><span class="dot"></span><span class="blue">' + esc($('branch').value) + '</span><span class="dot"></span><span class="lbl">Branch</span></div>' +
+    '<p class="p-line">Dear Sir,</p>' +
+    '<p class="p-line">I/We would like to request you to arrange fund transfer through ' + ft + ' facility as per receiver details/attached documents by debiting my/our below mentioning account maintaining with your branch with applicable charge &amp; Government Taxes.</p>' +
+    '<p class="p-sec">Sender Details :</p>' +
+    '<div class="p-row"><span class="lbl">Account Number:</span><span class="blue">' + esc($('senderAcct').value) + '</span><span class="dot"></span><span class="lbl">Account Title:</span><span class="blue">' + esc($('senderTitle').value) + '</span><span class="dot"></span></div>' +
+    '<div class="p-row"><span class="lbl">Amount:</span><span class="blue">' + esc(amtDisp) + '</span><span class="dot"></span><span class="lbl">Amount in words:</span><span class="blue">' + esc($('amountWords').value) + '</span><span class="dot"></span></div>' +
+    '<div class="p-row"><span class="lbl">Cheque no:</span><span class="blue">' + esc($('cheque').value) + '</span><span class="dot"></span><span class="lbl">(If applicable)</span><span class="lbl">Account Holder\'s Mobile No:</span><span class="blue">' + esc($('mobile').value) + '</span><span class="dot"></span></div>' +
+    '<div class="p-row"><span class="lbl">Account Holder\'s Branch Name:</span><span class="blue">' + esc($('branchName').value) + '</span><span class="dot"></span></div>' +
+    '<div class="p-sigline-right"><div class="ln"></div>Signature of Account Holder(s)</div>' +
+    '<p class="p-bankuse-title">For Bank\'s use only</p>' +
+    bankUse +
+    '<p class="p-sec">Receiver\'s Details:</p>' +
+    recvRow1 +
+    '<div class="p-row"><span class="lbl">Routing Number:</span><span class="blue">' + esc($('routing').value) + '</span><span class="dot"></span><span class="lbl">' + (ft === 'BEFTN' ? 'Receiver\'s Account Number:' : 'Receiving Account Number:') + '</span><span class="blue">' + esc($('recvAcct').value) + '</span><span class="dot"></span></div>' +
+    '<div class="p-row"><span class="lbl">Receiver\'s Name:</span><span class="blue">' + esc($('recvName').value) + '</span><span class="dot"></span><span class="lbl">Amount:</span><span class="blue">' + esc(rAmtDisp) + '</span><span class="dot"></span></div>' +
+    '<div class="p-row"><span class="lbl">Amount is words :</span><span class="blue">' + esc($('recvWords').value) + '</span><span class="dot"></span><span class="lbl">Receiver\'s Mobile No:</span><span class="blue">' + esc($('recvMobile').value) + '</span><span class="dot"></span></div>' +
+    '<div class="p-row"><span class="lbl">Purpose of Transaction :</span><span class="blue">' + esc($('purpose').value) + '</span><span class="dot"></span></div>' +
+    midSection +
+    '<div class="p-ack"><h3>ACKNOWLEDGEMENT</h3>' +
+    '<div class="p-row"><span class="lbl">Dated</span><span class="blue">' + esc($('date').value) + '</span><span class="dot"></span></div>' +
+    '<div class="p-row"><span class="lbl">Acknowledge that Sonali Bank Limited,</span><span class="blue">' + esc($('branch').value) + '</span><span class="dot"></span><span class="lbl">Branch has debited Tk.</span><span class="blue">' + esc(amtDisp) + '</span><span class="dot"></span></div>' +
+    '<div class="p-row"><span class="lbl">(In words</span><span class="blue">' + esc($('amountWords').value) + '</span><span class="dot"></span><span class="lbl">) from account number</span><span class="blue">' + esc($('senderAcct').value) + '</span><span class="dot"></span><span class="lbl">For ' + ft + ' to</span></div>' +
+    '<div class="p-row"><span class="lbl">Account number</span><span class="blue">' + esc($('recvAcct').value) + '</span><span class="dot"></span><span class="lbl">of</span><span class="blue">' + esc($('recvBank').value) + '</span><span class="dot"></span><span class="lbl">Bank of</span><span class="blue">' + branchDisp + '</span><span class="dot"></span><span class="lbl">Branch.</span></div>' +
+    '<div class="p-sigrow"><div class="s"><div class="ln"></div>' + (ft === 'BEFTN' ? 'Authorized Signature' : 'Officer') + '</div><div class="s"><div class="ln"></div>' + (ft === 'BEFTN' ? 'Authorized Signature' : 'Manager') + '</div></div></div>';
+}
+
+// Init
+$('date').value = todayStr();
+loadSenderDefaults();
+refreshDropdown();
+onProfileSelect();
+updateAck();
+</script>
+</body>
+</html>
