@@ -17,8 +17,13 @@ import {
   DEFAULT_BILL_PAYMENT_DATA,
   formatRawOrComma,
   formatSheetNum,
+  getRowVoValues,
+  getVoColumnCount,
+  getVoLabel,
+  MIN_VO_COLUMNS,
   MONTH_OPTIONS,
   parseSheetNum,
+  setRowVoValue,
   TTItem,
 } from '../data/sheetsDefaults';
 import { SearchableSelect } from './SearchableSelect';
@@ -29,24 +34,25 @@ interface BillPaymentPrintViewProps {
 
 export const BillPaymentPrintView: React.FC<BillPaymentPrintViewProps> = ({ data }) => {
   const totals = computeBillPaymentTotals(data);
+  const voCount = totals.voCount;
+  const nameWidth = Math.max(16, 26 - Math.max(0, voCount - MIN_VO_COLUMNS) * 1.2);
+  const voWidth = (100 - nameWidth - 14) / voCount;
 
   return (
     <div className="sheet-a4-portrait bg-white text-[#111111]">
       {/* Bill Payment Table */}
       <table className="w-full border-collapse text-[11pt]" style={{ tableLayout: 'fixed' }}>
         <colgroup>
-          <col style={{ width: '26%' }} />
-          <col style={{ width: '12%' }} />
-          <col style={{ width: '12%' }} />
-          <col style={{ width: '12%' }} />
-          <col style={{ width: '12%' }} />
-          <col style={{ width: '12%' }} />
+          <col style={{ width: `${nameWidth}%` }} />
+          {Array.from({ length: voCount }, (_, idx) => (
+            <col key={idx} style={{ width: `${voWidth}%` }} />
+          ))}
           <col style={{ width: '14%' }} />
         </colgroup>
         <thead>
           <tr>
             <th
-              colSpan={7}
+              colSpan={voCount + 2}
               className="border border-[#222] py-1.5 text-center text-[15pt] font-normal font-sans"
             >
               {data.title || 'Bill Payment'}
@@ -54,11 +60,14 @@ export const BillPaymentPrintView: React.FC<BillPaymentPrintViewProps> = ({ data
           </tr>
           <tr>
             <th className="border border-[#222] py-1 px-2 text-center font-normal">Name</th>
-            <th className="border border-[#222] py-1 px-2 text-center font-normal">vo-1</th>
-            <th className="border border-[#222] py-1 px-2 text-center font-normal">Vo-2</th>
-            <th className="border border-[#222] py-1 px-2 text-center font-normal">vo-3</th>
-            <th className="border border-[#222] py-1 px-2 text-center font-normal">vo-4</th>
-            <th className="border border-[#222] py-1 px-2 text-center font-normal">vo-5</th>
+            {Array.from({ length: voCount }, (_, idx) => (
+              <th
+                key={idx}
+                className="border border-[#222] py-1 px-1 text-center font-normal"
+              >
+                {getVoLabel(idx)}
+              </th>
+            ))}
             <th
               className="border border-[#222] py-1 px-2 text-center font-normal"
               style={{ backgroundColor: '#D9CFE3' }}
@@ -70,7 +79,10 @@ export const BillPaymentPrintView: React.FC<BillPaymentPrintViewProps> = ({ data
         <tbody>
           {data.rows.map((row, idx) => {
             const rowTotal = totals.rowTotals[idx];
-            const cells = [row.vo1, row.vo2, row.vo3, row.vo4, row.vo5];
+            const cells = Array.from(
+              { length: voCount },
+              (_, idx) => getRowVoValues(row)[idx] ?? ''
+            );
             return (
               <tr key={row.id} className="relative">
                 <td
@@ -121,21 +133,15 @@ export const BillPaymentPrintView: React.FC<BillPaymentPrintViewProps> = ({ data
           })}
           <tr>
             <td className="border border-[#222] py-1 px-2 text-left text-[11pt]">Total</td>
-            <td className="border border-[#222] py-1 px-2 text-right text-[11pt]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {formatSheetNum(totals.vo1, false)}
-            </td>
-            <td className="border border-[#222] py-1 px-2 text-right text-[11pt]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {formatSheetNum(totals.vo2, false)}
-            </td>
-            <td className="border border-[#222] py-1 px-2 text-right text-[11pt]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {formatSheetNum(totals.vo3, false)}
-            </td>
-            <td className="border border-[#222] py-1 px-2 text-right text-[11pt]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {formatSheetNum(totals.vo4, false)}
-            </td>
-            <td className="border border-[#222] py-1 px-2 text-right text-[11pt]" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {formatSheetNum(totals.vo5, false)}
-            </td>
+            {totals.voTotals.map((voTotal, idx) => (
+              <td
+                key={idx}
+                className="border border-[#222] py-1 px-1 text-right text-[11pt]"
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              >
+                {formatSheetNum(voTotal, false)}
+              </td>
+            ))}
             <td className="border border-[#222] py-1 px-2 text-right text-[11pt]" style={{ fontVariantNumeric: 'tabular-nums' }}>
               {formatSheetNum(totals.billTotal, false)}
             </td>
@@ -324,9 +330,10 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
     }
   };
 
-  const getNextVoucherSlot = (row: BillPaymentRow): 'vo1' | 'vo2' | 'vo3' | 'vo4' | 'vo5' | null => {
-    const slots = ['vo1', 'vo2', 'vo3', 'vo4', 'vo5'] as const;
-    return slots.find((s) => row[s].trim() === '') ?? null;
+  const getNextVoIndex = (row: BillPaymentRow): number => {
+    const values = getRowVoValues(row);
+    const emptyIndex = values.findIndex((value) => value.trim() === '');
+    return emptyIndex === -1 ? values.length : emptyIndex;
   };
 
   const handleSaveRowEntry = (e: React.FormEvent) => {
@@ -357,19 +364,20 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
       setFeedback(`'${created.name}' টেবিলে যোগ ও সেভ হয়েছে!`);
     } else {
       const current = data.rows.find((r) => r.id === selectedRowId) || rowDraft;
-      const updatedRow: BillPaymentRow = {
+      let updatedRow: BillPaymentRow = {
         ...current,
         name: current.name.trim(),
         ok: rowDraft.ok,
       };
 
       if (entered !== '') {
-        const emptySlot = getNextVoucherSlot(current);
-        if (emptySlot) {
-          updatedRow[emptySlot] = entered;
-        } else {
-          updatedRow.vo5 = String(parseSheetNum(current.vo5) + parseSheetNum(entered));
-        }
+        const values = getRowVoValues(current);
+        const targetIndex = getNextVoIndex(current);
+        const mergedValue =
+          targetIndex < values.length
+            ? String(parseSheetNum(values[targetIndex]) + parseSheetNum(entered))
+            : entered;
+        updatedRow = setRowVoValue(updatedRow, targetIndex, mergedValue);
       }
 
       const updatedRows = data.rows.map((r) => (r.id === selectedRowId ? updatedRow : r));
@@ -522,20 +530,16 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
     setFeedback('সব ডেটা ডিফল্ট ০ / খালি করা হয়েছে।');
   };
 
-  const existingRowTotal =
-    parseSheetNum(rowDraft.vo1) +
-    parseSheetNum(rowDraft.vo2) +
-    parseSheetNum(rowDraft.vo3) +
-    parseSheetNum(rowDraft.vo4) +
-    parseSheetNum(rowDraft.vo5);
+  const draftVoValues = getRowVoValues(rowDraft);
+  const existingRowTotal = draftVoValues.reduce(
+    (acc, value) => acc + parseSheetNum(value),
+    0
+  );
   const rowDraftTotal = existingRowTotal + parseSheetNum(voucherAmount);
-  const nextSlot = getNextVoucherSlot(rowDraft);
-  const nextSlotLabel =
-    nextSlot === 'vo2'
-      ? 'Vo-2'
-      : nextSlot
-      ? `vo-${nextSlot.slice(2)}`
-      : 'vo-5 (+)';
+  const nextVoIndex = getNextVoIndex(rowDraft);
+  const nextSlotLabel = `${getVoLabel(nextVoIndex)}${
+    nextVoIndex >= draftVoValues.length ? ' (+)' : ''
+  }`;
 
   return (
     <div className="space-y-4">
@@ -964,15 +968,21 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-xs">
+              <table
+                className="w-full border-collapse text-xs"
+                style={{ minWidth: 720 + Math.max(0, totals.voCount - MIN_VO_COLUMNS) * 80 }}
+              >
                 <thead>
                   <tr className="bg-[#F4F6F5] text-[#47554E] font-semibold">
                     <th className="border border-[#DCE3DF] px-2.5 py-2 text-left">Name</th>
-                    <th className="border border-[#DCE3DF] px-2 py-2 text-right">vo-1</th>
-                    <th className="border border-[#DCE3DF] px-2 py-2 text-right">Vo-2</th>
-                    <th className="border border-[#DCE3DF] px-2 py-2 text-right">vo-3</th>
-                    <th className="border border-[#DCE3DF] px-2 py-2 text-right">vo-4</th>
-                    <th className="border border-[#DCE3DF] px-2 py-2 text-right">vo-5</th>
+                    {Array.from({ length: totals.voCount }, (_, idx) => (
+                      <th
+                        key={idx}
+                        className="border border-[#DCE3DF] px-2 py-2 text-right"
+                      >
+                        {getVoLabel(idx)}
+                      </th>
+                    ))}
                     <th className="border border-[#DCE3DF] px-2.5 py-2 text-right bg-[#ECE7F2]">
                       Total
                     </th>
@@ -990,11 +1000,11 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
                         <td className="border border-[#DCE3DF] px-2.5 py-2 font-medium">
                           {row.name}
                         </td>
-                        {(['vo1', 'vo2', 'vo3', 'vo4', 'vo5'] as const).map((field) => {
-                          const disp = formatRawOrComma(row[field]);
+                        {Array.from({ length: totals.voCount }, (_, idx) => {
+                          const disp = formatRawOrComma(getRowVoValues(row)[idx] ?? '');
                           return (
                             <td
-                              key={field}
+                              key={idx}
                               className="border border-[#DCE3DF] px-2 py-2 text-right font-mono-tabular"
                               style={{ backgroundColor: disp ? '#FEF3C7' : undefined }}
                             >
@@ -1038,21 +1048,14 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
                 <tfoot>
                   <tr className="bg-[#F4F6F5] font-bold">
                     <td className="border border-[#DCE3DF] px-2.5 py-2">Total</td>
-                    <td className="border border-[#DCE3DF] px-2 py-2 text-right font-mono-tabular">
-                      {formatSheetNum(totals.vo1, false)}
-                    </td>
-                    <td className="border border-[#DCE3DF] px-2 py-2 text-right font-mono-tabular">
-                      {formatSheetNum(totals.vo2, false)}
-                    </td>
-                    <td className="border border-[#DCE3DF] px-2 py-2 text-right font-mono-tabular">
-                      {formatSheetNum(totals.vo3, false)}
-                    </td>
-                    <td className="border border-[#DCE3DF] px-2 py-2 text-right font-mono-tabular">
-                      {formatSheetNum(totals.vo4, false)}
-                    </td>
-                    <td className="border border-[#DCE3DF] px-2 py-2 text-right font-mono-tabular">
-                      {formatSheetNum(totals.vo5, false)}
-                    </td>
+                    {totals.voTotals.map((voTotal, idx) => (
+                      <td
+                        key={idx}
+                        className="border border-[#DCE3DF] px-2 py-2 text-right font-mono-tabular"
+                      >
+                        {formatSheetNum(voTotal, false)}
+                      </td>
+                    ))}
                     <td className="border border-[#DCE3DF] px-2.5 py-2 text-right font-mono-tabular text-[#006633]">
                       {formatSheetNum(totals.billTotal, false)}
                     </td>
@@ -1227,35 +1230,58 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {(['vo1', 'vo2', 'vo3', 'vo4', 'vo5'] as const).map((field, idx) => (
-                <div key={field}>
-                  <label className="block text-xs font-semibold text-[#47554E] mb-1.5">
-                    {idx === 1 ? 'Vo-2' : `vo-${idx + 1}`}
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={editingRowModal[field]}
-                    onChange={(e) =>
-                      setEditingRowModal({ ...editingRowModal, [field]: e.target.value })
-                    }
-                    placeholder="0"
-                    className="w-full px-3 py-2.5 text-sm text-right font-mono-tabular bg-white border border-[#BFCAC4] rounded focus:outline-none focus:border-[#006633]"
-                  />
-                </div>
-              ))}
+              {Array.from(
+                {
+                  length: Math.max(
+                    MIN_VO_COLUMNS,
+                    getRowVoValues(editingRowModal).length
+                  ),
+                },
+                (_, idx) => {
+                  const value = getRowVoValues(editingRowModal)[idx] ?? '';
+                  return (
+                    <div key={idx}>
+                      <label className="block text-xs font-semibold text-[#47554E] mb-1.5">
+                        {getVoLabel(idx)}
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={value}
+                        onChange={(e) =>
+                          setEditingRowModal((prev) =>
+                            prev ? setRowVoValue(prev, idx, e.target.value) : prev
+                          )
+                        }
+                        placeholder="0"
+                        className="w-full px-3 py-2.5 text-sm text-right font-mono-tabular bg-white border border-[#BFCAC4] rounded focus:outline-none focus:border-[#006633]"
+                      />
+                    </div>
+                  );
+                }
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  setEditingRowModal((prev) =>
+                    prev ? setRowVoValue(prev, getRowVoValues(prev).length, '') : prev
+                  )
+                }
+                className="self-end px-3 py-2.5 rounded-md border border-dashed border-[#006633] text-[#006633] text-xs font-semibold hover:bg-[#F0F7F3] cursor-pointer"
+              >
+                + {getVoLabel(getRowVoValues(editingRowModal).length)}
+              </button>
             </div>
 
             <div className="p-4 bg-[#F8FAF9] border border-[#DCE3DF] rounded-md flex items-center justify-between">
               <span className="text-sm font-semibold text-[#47554E]">Calculated Row Total</span>
               <span className="text-lg font-bold font-mono-tabular text-[#006633]">
                 {formatSheetNum(
-                  parseSheetNum(editingRowModal.vo1) +
-                    parseSheetNum(editingRowModal.vo2) +
-                    parseSheetNum(editingRowModal.vo3) +
-                    parseSheetNum(editingRowModal.vo4) +
-                    parseSheetNum(editingRowModal.vo5),
+                  getRowVoValues(editingRowModal).reduce(
+                    (acc, value) => acc + parseSheetNum(value),
+                    0
+                  ),
                   false
                 )}
               </span>
