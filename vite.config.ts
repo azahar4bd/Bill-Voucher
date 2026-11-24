@@ -6,6 +6,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // Relative asset paths keep the built app working from any subpath
+    // (e.g. https://<user>.github.io/Bill-Voucher/ on GitHub Pages).
+    base: './',
     plugins: [
       react(),
       tailwindcss(),
