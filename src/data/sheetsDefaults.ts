@@ -61,7 +61,49 @@ export interface BillPaymentRow {
   vo3: string;
   vo4: string;
   vo5: string;
+  /** VO-6 onward. Index 0 is VO-6, index 1 is VO-7, and so on. */
+  extraVos?: string[];
   ok: boolean;
+}
+
+const BASE_VO_KEYS = ['vo1', 'vo2', 'vo3', 'vo4', 'vo5'] as const;
+export const MIN_VO_COLUMNS = BASE_VO_KEYS.length;
+
+export function getRowVoValues(row: BillPaymentRow): string[] {
+  return [...BASE_VO_KEYS.map((key) => row[key]), ...(row.extraVos ?? [])];
+}
+
+export function setRowVoValue(
+  row: BillPaymentRow,
+  index: number,
+  value: string
+): BillPaymentRow {
+  if (index < MIN_VO_COLUMNS) {
+    return { ...row, [BASE_VO_KEYS[index]]: value };
+  }
+  const extra = [...(row.extraVos ?? [])];
+  while (extra.length < index - MIN_VO_COLUMNS) extra.push('');
+  extra[index - MIN_VO_COLUMNS] = value;
+  return { ...row, extraVos: extra };
+}
+
+/** At least 5 columns; grows whenever any row has a value in VO-6 or beyond. */
+export function getVoColumnCount(data: BillPaymentSheetData): number {
+  let count: number = MIN_VO_COLUMNS;
+  for (const row of data.rows) {
+    const values = getRowVoValues(row);
+    for (let i = values.length - 1; i >= MIN_VO_COLUMNS; i -= 1) {
+      if (values[i].trim() !== '') {
+        count = Math.max(count, i + 1);
+        break;
+      }
+    }
+  }
+  return count;
+}
+
+export function getVoLabel(index: number): string {
+  return `vo-${index + 1}`;
 }
 
 export interface TTItem {
@@ -465,30 +507,37 @@ export function syncMonthlyVoucherRatesFromChallan(
 }
 
 export function computeBillPaymentTotals(data: BillPaymentSheetData) {
-  let vo1 = 0;
-  let vo2 = 0;
-  let vo3 = 0;
-  let vo4 = 0;
-  let vo5 = 0;
+  const voCount = getVoColumnCount(data);
+  const voTotals = Array.from({ length: voCount }, () => 0);
   const rowTotals = data.rows.map((r) => {
-    const v1 = parseSheetNum(r.vo1);
-    const v2 = parseSheetNum(r.vo2);
-    const v3 = parseSheetNum(r.vo3);
-    const v4 = parseSheetNum(r.vo4);
-    const v5 = parseSheetNum(r.vo5);
-    vo1 += v1;
-    vo2 += v2;
-    vo3 += v3;
-    vo4 += v4;
-    vo5 += v5;
-    return v1 + v2 + v3 + v4 + v5;
+    const values = getRowVoValues(r);
+    let rowTotal = 0;
+    for (let i = 0; i < voCount; i += 1) {
+      const amount = parseSheetNum(values[i] ?? '');
+      voTotals[i] += amount;
+      rowTotal += amount;
+    }
+    return rowTotal;
   });
   const billTotal = rowTotals.reduce((acc, n) => acc + n, 0);
   const ttTotal = data.ttItems.reduce((acc, item) => acc + parseSheetNum(item.amount), 0);
   const salaryNum = parseSheetNum(data.salary);
   const othersNum = parseSheetNum(data.others);
   const grandTotal = billTotal + ttTotal + salaryNum + othersNum;
-  return { rowTotals, vo1, vo2, vo3, vo4, vo5, billTotal, ttTotal, grandTotal };
+  return {
+    rowTotals,
+    voTotals,
+    voCount,
+    // Kept for existing callers that still read the fixed first five columns.
+    vo1: voTotals[0] ?? 0,
+    vo2: voTotals[1] ?? 0,
+    vo3: voTotals[2] ?? 0,
+    vo4: voTotals[3] ?? 0,
+    vo5: voTotals[4] ?? 0,
+    billTotal,
+    ttTotal,
+    grandTotal,
+  };
 }
 
 export function computeBankTransferTotals(data: BankTransferSheetData) {

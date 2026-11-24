@@ -7,6 +7,9 @@ import {
   computeMonthlyVoucherTotals,
   formatRawOrComma,
   formatSheetNum,
+  getRowVoValues,
+  getVoLabel,
+  MIN_VO_COLUMNS,
   MonthlyVoucherSheetData,
 } from '../data/sheetsDefaults';
 
@@ -83,7 +86,10 @@ export function generateBillPaymentPdf(data: BillPaymentSheetData): void {
   const totals = computeBillPaymentTotals(data);
 
   const x0 = 14;
-  const colWidths = [46, 21, 21, 21, 21, 21, 25];
+  const voCount = totals.voCount;
+  const nameW = Math.max(26, 46 - Math.max(0, voCount - MIN_VO_COLUMNS) * 1.5);
+  const voW = (182 - nameW - 25) / voCount;
+  const colWidths = [nameW, ...Array.from({ length: voCount }, () => voW), 25];
   const totalW = colWidths.reduce((a, b) => a + b, 0);
 
   const GOLD: [number, number, number] = [249, 228, 142];
@@ -100,14 +106,18 @@ export function generateBillPaymentPdf(data: BillPaymentSheetData): void {
   y += 9;
 
   // Header Row
-  const headers = ['Name', 'vo-1', 'Vo-2', 'vo-3', 'vo-4', 'vo-5', 'Total'];
+  const headers = [
+    'Name',
+    ...Array.from({ length: voCount }, (_, idx) => getVoLabel(idx)),
+    'Total',
+  ];
   let cx = x0;
   headers.forEach((hLabel, idx) => {
     drawCellText(doc, hLabel, cx, y, colWidths[idx], 8.5, {
       align: 'center',
       bold: false,
       fontSize: 9.5,
-      fillRgb: idx === 6 ? LAVENDER : undefined,
+      fillRgb: idx === colWidths.length - 1 ? LAVENDER : undefined,
     });
     cx += colWidths[idx];
   });
@@ -119,18 +129,16 @@ export function generateBillPaymentPdf(data: BillPaymentSheetData): void {
     const rTotal = totals.rowTotals[rIdx];
     const cells = [
       row.name,
-      formatRawOrComma(row.vo1),
-      formatRawOrComma(row.vo2),
-      formatRawOrComma(row.vo3),
-      formatRawOrComma(row.vo4),
-      formatRawOrComma(row.vo5),
+      ...Array.from({ length: voCount }, (_, idx) =>
+        formatRawOrComma(getRowVoValues(row)[idx] ?? '')
+      ),
       formatSheetNum(rTotal, true),
     ];
 
     cx = x0;
     cells.forEach((val, cIdx) => {
-      const isVoucherCol = cIdx >= 1 && cIdx <= 5;
-      const isTotalCol = cIdx === 6;
+      const isVoucherCol = cIdx >= 1 && cIdx <= voCount;
+      const isTotalCol = cIdx === colWidths.length - 1;
       const shouldFill = (isVoucherCol && val !== '') || (isTotalCol && val !== '');
       drawCellText(doc, val, cx, y, colWidths[cIdx], rowH, {
         align: cIdx === 0 ? 'left' : 'right',
@@ -153,11 +161,7 @@ export function generateBillPaymentPdf(data: BillPaymentSheetData): void {
   // Total Row
   const footVals = [
     'Total',
-    formatSheetNum(totals.vo1, false),
-    formatSheetNum(totals.vo2, false),
-    formatSheetNum(totals.vo3, false),
-    formatSheetNum(totals.vo4, false),
-    formatSheetNum(totals.vo5, false),
+    ...totals.voTotals.map((voTotal) => formatSheetNum(voTotal, false)),
     formatSheetNum(totals.billTotal, false),
   ];
   cx = x0;
