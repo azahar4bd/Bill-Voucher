@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Building2,
+  Cloud,
   FileDown,
   FileText,
   Pencil,
@@ -13,6 +14,7 @@ import {
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { AddBankModal } from './components/AddBankModal';
+import { CloudSyncPanel } from './components/CloudSyncPanel';
 import { BankTransferPrintView, BankTransferSheet } from './components/BankTransferSheet';
 import { BillPaymentPrintView, BillPaymentSheet } from './components/BillPaymentSheet';
 import { ChallanPrintView, ChallanSheet } from './components/ChallanSheet';
@@ -97,6 +99,7 @@ export function App() {
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isAddBankOpen, setIsAddBankOpen] = useState(false);
+  const [isSyncOpen, setIsSyncOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const [billPaymentData, setBillPaymentData] = useState<BillPaymentSheetData>(() => {
@@ -598,7 +601,16 @@ export function App() {
             ))}
           </nav>
 
-          <div className="flex items-center shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsSyncOpen((open) => !open)}
+              title="ডেটা সিঙ্ক"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[#006633] text-[#006633] text-sm font-semibold hover:bg-[#F0F7F3] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Cloud className="w-4 h-4" />
+              <span className="hidden xl:inline">Sync</span>
+            </button>
             <button
               type="button"
               onClick={handleSavePdf}
@@ -1325,6 +1337,13 @@ export function App() {
           </div>
         )}
       </div>
+
+      {isSyncOpen && (
+        <CloudSyncPanel
+          onClose={() => setIsSyncOpen(false)}
+          notify={showToast}
+        />
+      )}
 
       {/* Add New Bank Modal */}
       <AddBankModal
