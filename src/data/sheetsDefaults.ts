@@ -13,21 +13,6 @@ export const STORAGE_KEY_MONTHLY_VOUCHER = 'sonaliStudio_monthlyVoucher_v3';
 export const STORAGE_KEY_VAT_CHALLAN = 'sonaliStudio_vatChallan_v1';
 export const STORAGE_KEY_TAX_CHALLAN = 'sonaliStudio_taxChallan_v1';
 
-export const MONTH_OPTIONS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
 export function parseSheetNum(val: string | number | undefined): number {
   if (val === undefined || val === null) return 0;
   const cleaned = String(val).replace(/,/g, '').trim();
@@ -116,7 +101,6 @@ export interface TTItem {
 
 export interface BillPaymentSheetData {
   title: string;
-  monthLabel?: string;
   rows: BillPaymentRow[];
   ttTitle: string;
   ttItems: TTItem[];
@@ -150,7 +134,6 @@ export const BILL_PAYMENT_TT_CATALOG = [
 
 export const DEFAULT_BILL_PAYMENT_DATA: BillPaymentSheetData = {
   title: 'Bill Payment',
-  monthLabel: '',
   rows: [],
   ttTitle: 'T,T',
   ttItems: [],
@@ -186,7 +169,6 @@ export interface BankTransferBlock {
 }
 
 export interface BankTransferSheetData {
-  monthLabel: string;
   blocks: BankTransferBlock[];
 }
 
@@ -225,7 +207,6 @@ export const BANK_TRANSFER_BANK_CATALOG: BankTransferBlock[] = [
 ];
 
 export const DEFAULT_BANK_TRANSFER_DATA: BankTransferSheetData = {
-  monthLabel: '',
   blocks: [],
 };
 
@@ -254,7 +235,6 @@ export interface MonthlyVoucherHeadRate {
 
 export interface MonthlyVoucherSheetData {
   sheetTitle: string;
-  monthLabel: string;
   /** Only heads the user has actually entered. */
   rows: MonthlyVoucherRow[];
   /** Saved VAT/Tax rates for heads not yet present in the table. */
@@ -292,7 +272,6 @@ export const MONTHLY_VOUCHER_HEAD_CATALOG: MonthlyVoucherRow[] = [
 
 export const DEFAULT_MONTHLY_VOUCHER_DATA: MonthlyVoucherSheetData = {
   sheetTitle: 'Monthly Voucher Statement',
-  monthLabel: '',
   rows: [],
   headRates: {},
 };
@@ -310,7 +289,6 @@ export function resequenceMonthlyVoucherRows(rows: MonthlyVoucherRow[]): Monthly
 export interface ChallanSheetData {
   challanNo: string;
   date: string;
-  monthLabel: string;
   district: string;
   branch: string;
   codeDigits: string[];
@@ -319,7 +297,6 @@ export interface ChallanSheetData {
 export const DEFAULT_VAT_CHALLAN_DATA: ChallanSheetData = {
   challanNo: '',
   date: '',
-  monthLabel: '',
   district: 'নড়াইল',
   branch: 'গোবরা',
   codeDigits: ['১', '১', '১', '০', '২', '০', '৪', '১', '০', '২', '০', '২', '০', '১', '৪', '১', '১', '০', '১'],
@@ -328,7 +305,6 @@ export const DEFAULT_VAT_CHALLAN_DATA: ChallanSheetData = {
 export const DEFAULT_TAX_CHALLAN_DATA: ChallanSheetData = {
   challanNo: '',
   date: '',
-  monthLabel: '',
   district: 'নড়াইল',
   branch: 'গোবরা',
   codeDigits: ['১', '১', '১', '০', '২', '১', '৭', '১', '০', '৩', '০', '৮', '৫', '১', '১', '১', '২', '১', '০', '১'],

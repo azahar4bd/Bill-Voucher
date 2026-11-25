@@ -17,10 +17,10 @@ import {
   addSheetAmount,
   BankTransferBlock,
   BANK_TRANSFER_BANK_CATALOG,
+  BankTransferLineItem,
   BankTransferSheetData,
   computeBankTransferTotals,
   DEFAULT_BANK_TRANSFER_DATA,
-  MONTH_OPTIONS,
   parseSheetNum,
 } from '../data/sheetsDefaults';
 import { SearchableSelect } from './SearchableSelect';
@@ -34,10 +34,6 @@ export const BankTransferPrintView: React.FC<BankTransferPrintViewProps> = ({ da
 
   return (
     <div className="sheet-a4-landscape bg-white text-[#111111]">
-      <div className="mb-2 text-[14pt] font-normal pl-2">
-        Name Of Month- &nbsp;&nbsp;{data.monthLabel}
-      </div>
-
       <table
         className="w-full border-collapse text-[9.5pt]"
         style={{ tableLayout: 'fixed', border: '1.5px solid #111' }}
@@ -217,6 +213,14 @@ interface BankTransferSheetProps {
   onSavePdf: () => void;
 }
 
+function newLineItem(): BankTransferLineItem {
+  return {
+    id: `bti-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    description: '',
+    amount: '',
+  };
+}
+
 function emptyBlockDraft(): BankTransferBlock {
   return {
     id: '',
@@ -226,7 +230,7 @@ function emptyBlockDraft(): BankTransferBlock {
     routingNo: '',
     branchName: '',
     showTotalRow: true,
-    items: [],
+    items: [newLineItem()],
   };
 }
 
@@ -276,16 +280,17 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
     if (id.startsWith('catalog:')) {
       const template = BANK_TRANSFER_BANK_CATALOG.find((b) => b.id === id.slice(8));
       if (template) {
-        setBlockDraft({ ...template, items: [] });
+        setBlockDraft({ ...template, items: [newLineItem()] });
         return;
       }
     }
     const found = data.blocks.find((b) => b.id === id);
     if (found) {
-      // Amounts are not copied into the entry form — only into the table on Save.
+      // Amounts start empty on each save, but at least one row stays visible for entry.
+      const rows = found.items.map((it) => ({ ...it, amount: '' }));
       setBlockDraft({
         ...found,
-        items: found.items.map((it) => ({ ...it, amount: '' })),
+        items: rows.length > 0 ? rows : [newLineItem()],
       });
     }
   };
@@ -359,10 +364,10 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
     if (selectedBlockId === '__NEW__') {
       setBlockDraft(emptyBlockDraft());
     } else {
-      setBlockDraft((prev) => ({
-        ...prev,
-        items: prev.items.map((it) => ({ ...it, amount: '' })),
-      }));
+      setBlockDraft((prev) => {
+        const rows = prev.items.map((it) => ({ ...it, amount: '' }));
+        return { ...prev, items: rows.length > 0 ? rows : [newLineItem()] };
+      });
     }
   };
 
@@ -373,9 +378,10 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
       const first = nextBlocks[0];
       if (first) {
         setSelectedBlockId(first.id);
+        const rows = first.items.map((it) => ({ ...it, amount: '' }));
         setBlockDraft({
           ...first,
-          items: first.items.map((it) => ({ ...it, amount: '' })),
+          items: rows.length > 0 ? rows : [newLineItem()],
         });
       } else {
         setSelectedBlockId('__NEW__');
@@ -424,7 +430,7 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
       <div className="bg-white border border-[#DCE3DF] rounded-lg px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-base font-bold text-[#131C18]">
-            Bank Transfer Breakdown {data.monthLabel ? `(${data.monthLabel})` : ''}
+            Bank Transfer Breakdown
           </h1>
           <div className="flex flex-wrap items-center gap-2 text-xs text-[#5B6962] mt-0.5 font-mono-tabular">
             <span>{data.blocks.length}টি ব্যাংক</span>
@@ -502,7 +508,7 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
           {/* 1. Searchable Dropdown Selector + Single Bank Entry Form */}
           <section className="bg-white border border-[#DCE3DF] rounded-lg p-5 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-              <div className="md:col-span-8">
+              <div className="md:col-span-12">
                 <label
                   htmlFor="btBlockSelector"
                   className="block text-xs font-semibold text-[#006633] mb-1.5"
@@ -536,22 +542,6 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
                   value={selectedBlockId}
                   onChange={handleSelectBlock}
                   placeholder="ব্যাংক বা একাউন্ট নাম খুঁজুন..."
-                />
-              </div>
-
-              <div className="md:col-span-4">
-                <label
-                  htmlFor="btMonthSelector"
-                  className="block text-xs font-medium text-[#47554E] mb-1.5"
-                >
-                  Name Of Month (মাসের নাম)
-                </label>
-                <SearchableSelect
-                  id="btMonthSelector"
-                  options={MONTH_OPTIONS.map((m) => ({ value: m, label: m }))}
-                  value={data.monthLabel}
-                  onChange={(val) => onChange({ ...data, monthLabel: val })}
-                  placeholder="মাস খুঁজুন বা সিলেক্ট করুন..."
                 />
               </div>
             </div>
@@ -724,7 +714,9 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
                               ),
                             }))
                           }
-                          placeholder="0"
+                          placeholder="Amount (Taka)"
+                          aria-label="Amount in Taka"
+                          title="Amount in Taka"
                           className="col-span-4 px-3 py-2 text-sm text-right font-mono-tabular bg-white border border-[#BFCAC4] rounded focus:outline-none focus:border-[#006633]"
                         />
                         <button
@@ -772,7 +764,7 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-[#EAEFEF]">
               <div>
                 <h2 className="text-sm font-semibold text-[#006633]">
-                  Bank Transfer টেবিল (Name Of Month- {data.monthLabel || '___'})
+                  Bank Transfer টেবিল
                 </h2>
                 <span className="text-xs text-[#5B6962]">
                   Edit বাটনে চাপলে ফুলস্ক্রিন এডিট পপআপ খুলবে

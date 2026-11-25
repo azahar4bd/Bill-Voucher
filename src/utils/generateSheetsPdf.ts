@@ -254,12 +254,6 @@ export function generateBankTransferPdf(data: BankTransferSheetData): void {
 
   let y = 16;
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(13.5);
-  doc.setTextColor(17, 17, 17);
-  doc.text(`Name Of Month-   ${data.monthLabel || ''}`, x0 + 4, y);
-  y += 5.5;
-
   const hdrH = 12;
   const subH = 6;
   const singleHdrLabels = [
@@ -395,8 +389,7 @@ export function generateBankTransferPdf(data: BankTransferSheetData): void {
   doc.setLineWidth(0.48);
   doc.rect(x0, y, totalW, 7.8, 'S');
 
-  const safeMonth = data.monthLabel.replace(/[^\w-]/g, '_') || 'Month';
-  doc.save(`Bank_Transfer_Breakdown_${safeMonth}.pdf`);
+  doc.save('Bank_Transfer_Breakdown.pdf');
 }
 
 /* =========================================================
@@ -416,9 +409,7 @@ export function generateMonthlyVoucherPdf(data: MonthlyVoucherSheetData): void {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(17, 17, 17);
-  const titleText = data.monthLabel.trim()
-    ? `${data.sheetTitle || 'Monthly Voucher Statement'} - ${data.monthLabel}`
-    : data.sheetTitle || 'Monthly Voucher Statement';
+  const titleText = data.sheetTitle || 'Monthly Voucher Statement';
   doc.text(titleText, x0 + totalW / 2, y, { align: 'center' });
   y += 6;
 
@@ -495,6 +486,5 @@ export function generateMonthlyVoucherPdf(data: MonthlyVoucherSheetData): void {
     cx += w[idx];
   });
 
-  const safeMonth = data.monthLabel.replace(/[^\w-]/g, '_') || 'Statement';
-  doc.save(`Monthly_Voucher_${safeMonth}.pdf`);
+  doc.save('Monthly_Voucher_Statement.pdf');
 }
