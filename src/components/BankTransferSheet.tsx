@@ -14,7 +14,9 @@ import {
 } from 'lucide-react';
 import { BankProfile } from '../data/bankDefaults';
 import {
+  addSheetAmount,
   BankTransferBlock,
+  BANK_TRANSFER_BANK_CATALOG,
   BankTransferSheetData,
   computeBankTransferTotals,
   DEFAULT_BANK_TRANSFER_DATA,
@@ -224,7 +226,7 @@ function emptyBlockDraft(): BankTransferBlock {
     routingNo: '',
     branchName: '',
     showTotalRow: true,
-    items: [{ id: `bti-${Date.now()}`, description: '', amount: '' }],
+    items: [],
   };
 }
 
@@ -269,11 +271,22 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
     setSelectedBlockId(id);
     if (!id || id === '__NEW__') {
       setBlockDraft(emptyBlockDraft());
-    } else {
-      const found = data.blocks.find((b) => b.id === id);
-      if (found) {
-        setBlockDraft({ ...found, items: found.items.map((it) => ({ ...it })) });
+      return;
+    }
+    if (id.startsWith('catalog:')) {
+      const template = BANK_TRANSFER_BANK_CATALOG.find((b) => b.id === id.slice(8));
+      if (template) {
+        setBlockDraft({ ...template, items: [] });
+        return;
       }
+    }
+    const found = data.blocks.find((b) => b.id === id);
+    if (found) {
+      // Amounts are not copied into the entry form — only into the table on Save.
+      setBlockDraft({
+        ...found,
+        items: found.items.map((it) => ({ ...it, amount: '' })),
+      });
     }
   };
 
@@ -288,27 +301,56 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
       return;
     }
 
-    if (selectedBlockId === '__NEW__') {
+    const existing =
+      selectedBlockId === '__NEW__' || selectedBlockId.startsWith('catalog:')
+        ? data.blocks.find(
+            (b) =>
+              b.accountNumber.trim() !== '' &&
+              b.accountNumber === blockDraft.accountNumber.trim()
+          )
+        : data.blocks.find((b) => b.id === selectedBlockId);
+
+    if (!existing) {
       const created: BankTransferBlock = {
         ...blockDraft,
         id: `bt-${Date.now()}`,
-        items: blockDraft.items.map((it) => ({ ...it })),
+        items: blockDraft.items
+          .filter((it) => it.description.trim() !== '' || parseSheetNum(it.amount) !== 0)
+          .map((it) => ({ ...it, id: `bti-${Date.now()}-${it.id}` })),
       };
       onChange({ ...data, blocks: [...data.blocks, created] });
       setFeedback(`'${created.bankName}' টেবিলে যোগ ও সেভ হয়েছে!`);
     } else {
+      const mergedItems = [...existing.items];
+      blockDraft.items.forEach((item) => {
+        if (item.description.trim() === '' && parseSheetNum(item.amount) === 0) return;
+        const match = mergedItems.find(
+          (prev) =>
+            prev.id === item.id ||
+            (item.description.trim() !== '' &&
+              prev.description.trim().toLowerCase() === item.description.trim().toLowerCase())
+        );
+        if (match) {
+          match.description = item.description || match.description;
+          match.amount = addSheetAmount(match.amount, item.amount);
+          match.bold = item.bold ?? match.bold;
+        } else {
+          mergedItems.push({ ...item, id: `bti-${Date.now()}-${mergedItems.length}` });
+        }
+      });
+      const updated: BankTransferBlock = {
+        ...existing,
+        ...blockDraft,
+        id: existing.id,
+        items: mergedItems,
+      };
       onChange({
         ...data,
-        blocks: data.blocks.map((b) =>
-          b.id === selectedBlockId
-            ? { ...blockDraft, items: blockDraft.items.map((it) => ({ ...it })) }
-            : b
-        ),
+        blocks: data.blocks.map((b) => (b.id === existing.id ? updated : b)),
       });
-      setFeedback(`'${blockDraft.bankName}' আপডেট ও সেভ হয়েছে!`);
+      setFeedback(`'${updated.bankName}' আগের amount-এ নতুন amount যোগ করা হয়েছে!`);
     }
 
-    // Clear inputs & dropdown after Save
     setSelectedBlockId('');
     setBlockDraft(emptyBlockDraft());
   };
@@ -331,7 +373,10 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
       const first = nextBlocks[0];
       if (first) {
         setSelectedBlockId(first.id);
-        setBlockDraft({ ...first, items: first.items.map((it) => ({ ...it })) });
+        setBlockDraft({
+          ...first,
+          items: first.items.map((it) => ({ ...it, amount: '' })),
+        });
       } else {
         setSelectedBlockId('__NEW__');
         setBlockDraft(emptyBlockDraft());
@@ -469,8 +514,18 @@ export const BankTransferSheet: React.FC<BankTransferSheetProps> = ({
                   options={[
                     ...data.blocks.map((b, i) => ({
                       value: b.id,
-                      label: `${i + 1}. ${b.bankName || 'Unnamed Bank'} — ${b.accountName}`,
+                      label: `${i + 1}. ${b.bankName || 'Unnamed Bank'}${
+                        b.accountName ? ` — ${b.accountName}` : ''
+                      }`,
                       keywords: `${b.bankName} ${b.accountName} ${b.accountNumber} ${b.routingNo}`,
+                    })),
+                    ...BANK_TRANSFER_BANK_CATALOG.filter(
+                      (template) =>
+                        !data.blocks.some((b) => b.accountNumber === template.accountNumber)
+                    ).map((template) => ({
+                      value: `catalog:${template.id}`,
+                      label: template.bankName,
+                      keywords: `${template.accountNumber} ${template.routingNo} ${template.branchName}`,
                     })),
                     {
                       value: '__NEW__',

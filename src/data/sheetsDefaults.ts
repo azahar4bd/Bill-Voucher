@@ -67,7 +67,9 @@ export interface BillPaymentRow {
 }
 
 const BASE_VO_KEYS = ['vo1', 'vo2', 'vo3', 'vo4', 'vo5'] as const;
-export const MIN_VO_COLUMNS = BASE_VO_KEYS.length;
+const BASE_VO_COUNT = BASE_VO_KEYS.length;
+/** Only the first VO column is shown until the user enters more. */
+export const MIN_VO_COLUMNS = 1;
 
 export function getRowVoValues(row: BillPaymentRow): string[] {
   return [...BASE_VO_KEYS.map((key) => row[key]), ...(row.extraVos ?? [])];
@@ -78,12 +80,12 @@ export function setRowVoValue(
   index: number,
   value: string
 ): BillPaymentRow {
-  if (index < MIN_VO_COLUMNS) {
+  if (index < BASE_VO_COUNT) {
     return { ...row, [BASE_VO_KEYS[index]]: value };
   }
   const extra = [...(row.extraVos ?? [])];
-  while (extra.length < index - MIN_VO_COLUMNS) extra.push('');
-  extra[index - MIN_VO_COLUMNS] = value;
+  while (extra.length < index - BASE_VO_COUNT) extra.push('');
+  extra[index - BASE_VO_COUNT] = value;
   return { ...row, extraVos: extra };
 }
 
@@ -92,7 +94,7 @@ export function getVoColumnCount(data: BillPaymentSheetData): number {
   let count: number = MIN_VO_COLUMNS;
   for (const row of data.rows) {
     const values = getRowVoValues(row);
-    for (let i = values.length - 1; i >= MIN_VO_COLUMNS; i -= 1) {
+    for (let i = values.length - 1; i >= 0; i -= 1) {
       if (values[i].trim() !== '') {
         count = Math.max(count, i + 1);
         break;
@@ -122,34 +124,45 @@ export interface BillPaymentSheetData {
   others: string;
 }
 
+/** Quick-pick lists only — these are NOT table rows. */
+export const BILL_PAYMENT_STAFF_CATALOG = [
+  'Manager SIR',
+  'Azahar',
+  'Sakib',
+  'Monir',
+  'Minthu',
+  'Alamgir',
+  'Radhuni',
+  'House',
+  'Dokan',
+  'Entertainment',
+  'Etc/Wifi/Electricity/Sakib',
+];
+
+export const BILL_PAYMENT_TT_CATALOG = [
+  'Deduction',
+  'S/c',
+  'Stationary',
+  'Gratuity',
+  'Earn Leave',
+  'Vat+Tax',
+];
+
 export const DEFAULT_BILL_PAYMENT_DATA: BillPaymentSheetData = {
   title: 'Bill Payment',
   monthLabel: '',
-  rows: [
-    { id: 'bp-1', name: 'Manager SIR', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-2', name: 'Azahar', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-3', name: 'Sakib', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-4', name: 'Monir', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-5', name: 'Minthu', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-6', name: 'Alamgir', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-7', name: 'Radhuni', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-8', name: 'House', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-9', name: 'Dokan', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-10', name: 'Entertainment', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-    { id: 'bp-11', name: 'Etc/Wifi/Electricity/Sakib', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false },
-  ],
+  rows: [],
   ttTitle: 'T,T',
-  ttItems: [
-    { id: 'tt-1', label: 'Deduction', amount: '' },
-    { id: 'tt-2', label: 'S/c', amount: '' },
-    { id: 'tt-3', label: 'Stationary', amount: '' },
-    { id: 'tt-4', label: 'Gratuity', amount: '' },
-    { id: 'tt-5', label: 'Earn Leave', amount: '' },
-    { id: 'tt-6', label: 'Vat+Tax', amount: '' },
-  ],
+  ttItems: [],
   salary: '',
   others: '',
 };
+
+/** Amount entered twice is added to what is already in the table. */
+export function addSheetAmount(existing: string | undefined, added: string | undefined): string {
+  const sum = parseSheetNum(existing) + parseSheetNum(added);
+  return sum === 0 ? '' : String(sum);
+}
 
 /* =========================================================
    SHEET 2: Bank Transfer Breakdown (All amounts empty/0)
@@ -177,49 +190,43 @@ export interface BankTransferSheetData {
   blocks: BankTransferBlock[];
 }
 
+/** Quick-pick bank accounts — NOT table rows until the user adds an entry. */
+export const BANK_TRANSFER_BANK_CATALOG: BankTransferBlock[] = [
+  {
+    id: 'bt-1',
+    bankName: 'Bank Asia PLC-48',
+    accountName: '',
+    accountNumber: '0002536000048',
+    routingNo: '070471548',
+    branchName: 'Bank Asia ,Khulna Branch,Khulna',
+    showTotalRow: true,
+    items: [],
+  },
+  {
+    id: 'bt-2',
+    bankName: 'Bank Asia PLC-Gratuity',
+    accountName: '',
+    accountNumber: '0015636000143',
+    routingNo: '070472163',
+    branchName: 'Bank Asia ,Boro Bazar Branch,Khulna',
+    showTotalRow: false,
+    items: [],
+  },
+  {
+    id: 'bt-3',
+    bankName: 'UCBL PLC-pf',
+    accountName: '',
+    accountNumber: '0592112000001077',
+    routingNo: '245411667',
+    branchName: 'UCBL PLC ,Noapara Branch ,Noapara, Jashore',
+    showTotalRow: true,
+    items: [],
+  },
+];
+
 export const DEFAULT_BANK_TRANSFER_DATA: BankTransferSheetData = {
   monthLabel: '',
-  blocks: [
-    {
-      id: 'bt-1',
-      bankName: 'Bank Asia PLC',
-      accountName: 'Bandhu Kallyan Foundation',
-      accountNumber: '0002536000048',
-      routingNo: '070471548',
-      branchName: 'Bank Asia ,Khulna Branch,Khulna',
-      showTotalRow: true,
-      items: [
-        { id: 'bti-1', description: 'Motor Cycle', amount: '' },
-        { id: 'bti-2', description: 'Service Charge', amount: '' },
-        { id: 'bti-3', description: 'Mobile Loan', amount: '' },
-        { id: 'bti-4', description: 'Leave Expense', amount: '' },
-        { id: 'bti-5', description: 'Fund', amount: '' },
-      ],
-    },
-    {
-      id: 'bt-2',
-      bankName: 'Bank Asia PLC',
-      accountName: 'Bandhu Kallyan Foundation Gratuity',
-      accountNumber: '0015636000143',
-      routingNo: '070472163',
-      branchName: 'Bank Asia ,Boro Bazar Branch,Khulna',
-      showTotalRow: false,
-      items: [{ id: 'bti-6', description: 'Gratuity', amount: '', bold: true }],
-    },
-    {
-      id: 'bt-3',
-      bankName: 'UCBL PLC',
-      accountName: 'Bandhu Kallyan Foundation PF',
-      accountNumber: '0592112000001077',
-      routingNo: '245411667',
-      branchName: 'UCBL PLC ,Noapara Branch ,Noapara, Jashore',
-      showTotalRow: true,
-      items: [
-        { id: 'bti-7', description: 'PF', amount: '' },
-        { id: 'bti-8', description: 'PF Loan', amount: '' },
-      ],
-    },
-  ],
+  blocks: [],
 };
 
 /* =========================================================
@@ -239,16 +246,23 @@ export interface MonthlyVoucherRow {
   fixedVatTaxBase?: string;
 }
 
+export interface MonthlyVoucherHeadRate {
+  vatRate: string;
+  taxRate: string;
+  fixedVatTaxBase?: string;
+}
+
 export interface MonthlyVoucherSheetData {
   sheetTitle: string;
   monthLabel: string;
+  /** Only heads the user has actually entered. */
   rows: MonthlyVoucherRow[];
+  /** Saved VAT/Tax rates for heads not yet present in the table. */
+  headRates?: Record<string, MonthlyVoucherHeadRate>;
 }
 
-export const DEFAULT_MONTHLY_VOUCHER_DATA: MonthlyVoucherSheetData = {
-  sheetTitle: 'Monthly Voucher Statement',
-  monthLabel: '',
-  rows: [
+/** Quick-pick head catalog — NOT table rows until the user adds an entry. */
+export const MONTHLY_VOUCHER_HEAD_CATALOG: MonthlyVoucherRow[] = [
     { id: 'mv-1', slNo: '1', particulars: 'Salary & Allowance', codeNo: '5,001', totalVoucher: '', preAmount: '', vatRate: '', taxRate: '', vatManual: '', taxManual: '' },
     { id: 'mv-2', slNo: '2', particulars: 'Gratuity', codeNo: '7,601', totalVoucher: '', preAmount: '', vatRate: '', taxRate: '', vatManual: '', taxManual: '' },
     { id: 'mv-3', slNo: '3', particulars: 'Office Rent-Office', codeNo: '6,501', totalVoucher: '', preAmount: '', vatRate: '15', taxRate: '10', vatManual: '', taxManual: '' },
@@ -274,7 +288,13 @@ export const DEFAULT_MONTHLY_VOUCHER_DATA: MonthlyVoucherSheetData = {
     { id: 'mv-24', slNo: '23', particulars: 'Service Charge Buniyed', codeNo: '5,513', totalVoucher: '', preAmount: '', vatRate: '', taxRate: '', vatManual: '', taxManual: '' },
     { id: 'mv-25', slNo: '24', particulars: 'Service Charge Sufolon', codeNo: '5,514', totalVoucher: '', preAmount: '', vatRate: '', taxRate: '', vatManual: '', taxManual: '' },
     { id: 'mv-29', slNo: '25', particulars: 'MFCE', codeNo: '5,525', totalVoucher: '', preAmount: '', vatRate: '', taxRate: '', vatManual: '', taxManual: '' },
-  ],
+];
+
+export const DEFAULT_MONTHLY_VOUCHER_DATA: MonthlyVoucherSheetData = {
+  sheetTitle: 'Monthly Voucher Statement',
+  monthLabel: '',
+  rows: [],
+  headRates: {},
 };
 
 export function resequenceMonthlyVoucherRows(rows: MonthlyVoucherRow[]): MonthlyVoucherRow[] {
