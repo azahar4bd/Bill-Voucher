@@ -24,7 +24,6 @@ import {
   getVoColumnCount,
   getVoLabel,
   MIN_VO_COLUMNS,
-  MONTH_OPTIONS,
   parseSheetNum,
   setRowVoValue,
   TTItem,
@@ -674,7 +673,7 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
           {/* 1. Searchable Dropdown Selector + Single Active Entry Form */}
           <section className="bg-white border border-[#DCE3DF] rounded-lg p-5">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pb-4 mb-4 border-b border-[#EAEFEF] items-end">
-              <div className="md:col-span-8">
+              <div className="md:col-span-12">
                 <label
                   htmlFor="bpSectionSelect"
                   className="block text-xs font-semibold text-[#006633] mb-1.5"
@@ -703,22 +702,6 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
                   value={selectedSection}
                   onChange={handleSelectSection}
                   placeholder="এন্ট্রি ধরন খুঁজুন বা সিলেক্ট করুন..."
-                />
-              </div>
-
-              <div className="md:col-span-4">
-                <label
-                  htmlFor="bpMonthSelect"
-                  className="block text-xs font-medium text-[#47554E] mb-1.5"
-                >
-                  Month (মাসের নাম)
-                </label>
-                <SearchableSelect
-                  id="bpMonthSelect"
-                  options={MONTH_OPTIONS.map((m) => ({ value: m, label: m }))}
-                  value={data.monthLabel || ''}
-                  onChange={(val) => onChange({ ...data, monthLabel: val })}
-                  placeholder="মাস খুঁজুন বা সিলেক্ট করুন..."
                 />
               </div>
             </div>

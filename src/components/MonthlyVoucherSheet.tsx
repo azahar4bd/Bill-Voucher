@@ -23,7 +23,6 @@ import {
   DEFAULT_MONTHLY_VOUCHER_DATA,
   formatSheetNum,
   MONTHLY_VOUCHER_HEAD_CATALOG,
-  MONTH_OPTIONS,
   MonthlyVoucherHeadRate,
   MonthlyVoucherRow,
   MonthlyVoucherSheetData,
@@ -49,7 +48,6 @@ export const MonthlyVoucherPrintView: React.FC<MonthlyVoucherPrintViewProps> = (
     <div className="sheet-a4-portrait bg-white text-[#111111]">
       <div className="mb-3 text-center font-sans text-[13pt] font-bold">
         {data.sheetTitle || 'Monthly Voucher Statement'}
-        {data.monthLabel.trim() ? ` - ${data.monthLabel}` : ''}
       </div>
 
       <table
@@ -265,11 +263,6 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
       },
     ];
   }, [data.rows]);
-
-  const monthOptions = useMemo(
-    () => MONTH_OPTIONS.map((m) => ({ value: m, label: m })),
-    []
-  );
 
   const findHead = (id: string): MonthlyVoucherRow | undefined =>
     data.rows.find((r) => r.id === id) ||
@@ -503,7 +496,7 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
       vatManual: '',
       taxManual: '',
     }));
-    onChange({ ...data, monthLabel: '', rows: clearedRows });
+    onChange({ ...data, rows: clearedRows });
     setSelectedRowId('');
     setRowDraft(emptyRowDraft(''));
     setFeedback('টেবিলের সব এন্ট্রি ০ / খালি করা হয়েছে (VAT ও Tax রেট সংরক্ষিত আছে)।');
@@ -643,7 +636,7 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
           {/* 1. Searchable Dropdown Selector + Single Expense Head Entry Form */}
           <section className="bg-white border border-[#DCE3DF] rounded-lg p-5 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-              <div className="md:col-span-8">
+              <div className="md:col-span-12">
                 <label
                   htmlFor="mvHeadSelector"
                   className="block text-xs font-semibold text-[#006633] mb-1.5"
@@ -656,22 +649,6 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
                   value={selectedRowId}
                   onChange={handleSelectRow}
                   placeholder="খাত বা কোড খুঁজুন (যেমন: 6501 বা Office Rent)..."
-                />
-              </div>
-
-              <div className="md:col-span-4">
-                <label
-                  htmlFor="mvMonthSelector"
-                  className="block text-xs font-medium text-[#47554E] mb-1.5"
-                >
-                  Month (মাসের নাম)
-                </label>
-                <SearchableSelect
-                  id="mvMonthSelector"
-                  options={monthOptions}
-                  value={data.monthLabel}
-                  onChange={(val) => onChange({ ...data, monthLabel: val })}
-                  placeholder="মাস খুঁজুন বা সিলেক্ট করুন..."
                 />
               </div>
             </div>

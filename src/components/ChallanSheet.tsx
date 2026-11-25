@@ -12,10 +12,8 @@ import {
   DEFAULT_TAX_CHALLAN_DATA,
   DEFAULT_VAT_CHALLAN_DATA,
   findMatchingMonthlyVoucherRow,
-  MONTH_OPTIONS,
   MonthlyVoucherSheetData,
 } from '../data/sheetsDefaults';
-import { SearchableSelect } from './SearchableSelect';
 
 export type ChallanMode = 'VAT' | 'TAX';
 
@@ -627,11 +625,6 @@ export const ChallanSheet: React.FC<ChallanSheetProps> = ({
     return () => ro.disconnect();
   }, []);
 
-  const monthOptions = useMemo(
-    () => MONTH_OPTIONS.map((m) => ({ value: m, label: m })),
-    []
-  );
-
   const title = mode === 'VAT' ? 'VAT Challan (টি, আর ফরম নং ৬)' : 'Tax Challan (টি, আর ফরম নং ৬)';
   const groupSizes = mode === 'VAT' ? [1, 4, 4, 4, 6] : [1, 4, 4, 4, 7];
 
@@ -731,7 +724,7 @@ export const ChallanSheet: React.FC<ChallanSheetProps> = ({
       {/* Minimal Manual Entry Bar (Date + Searchable Month Dropdown) */}
       <section className="bg-white border border-[#DCE3DF] rounded-lg p-4 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-          <div className="md:col-span-5">
+          <div className="md:col-span-8">
             <label
               htmlFor={`challan-date-${mode}`}
               className="block text-xs font-semibold text-[#006633] mb-1.5"
@@ -753,18 +746,6 @@ export const ChallanSheet: React.FC<ChallanSheetProps> = ({
           </div>
 
           <div className="md:col-span-4">
-            <label className="block text-xs font-medium text-[#47554E] mb-1.5">
-              Month (মাসের নাম)
-            </label>
-            <SearchableSelect
-              options={monthOptions}
-              value={data.monthLabel}
-              onChange={(val) => onChange({ ...data, monthLabel: val })}
-              placeholder="মাস খুঁজুন বা সিলেক্ট করুন..."
-            />
-          </div>
-
-          <div className="md:col-span-3">
             <label className="block text-xs font-medium text-[#47554E] mb-1.5">
               চালান নং (ঐচ্ছিক)
             </label>

@@ -12,6 +12,33 @@ interface SonaliFormSheetProps {
   receiver: ReceiverFormData;
 }
 
+const MAX_FONT_PT = 10.2;
+const MIN_FONT_PT = 4.2;
+
+/** Measures text independently of the (possibly clipped) slot element. */
+function measureTextWidth(
+  text: string,
+  fontPt: number,
+  source: HTMLElement,
+): number {
+  const probe = document.createElement('span');
+  const style = window.getComputedStyle(source);
+  probe.textContent = text;
+  probe.style.position = 'absolute';
+  probe.style.left = '-10000px';
+  probe.style.top = '0';
+  probe.style.visibility = 'hidden';
+  probe.style.whiteSpace = 'nowrap';
+  probe.style.fontFamily = style.fontFamily;
+  probe.style.fontWeight = style.fontWeight;
+  probe.style.letterSpacing = style.letterSpacing;
+  probe.style.fontSize = `${fontPt}pt`;
+  document.body.appendChild(probe);
+  const width = probe.getBoundingClientRect().width;
+  probe.remove();
+  return width;
+}
+
 function DottedSlot({
   value,
   flex,
@@ -25,7 +52,7 @@ function DottedSlot({
 }) {
   const slotRef = useRef<HTMLSpanElement>(null);
   const valRef = useRef<HTMLSpanElement>(null);
-  const [fontPt, setFontPt] = useState<number>(10.2);
+  const [fontPt, setFontPt] = useState<number>(MAX_FONT_PT);
   const [allowWrap, setAllowWrap] = useState<boolean>(false);
 
   useLayoutEffect(() => {
@@ -37,45 +64,45 @@ function DottedSlot({
       const clean = (value || '').trim();
       const slotW = slotEl.clientWidth;
       if (!clean || slotW <= 0) {
-        valEl.style.whiteSpace = 'nowrap';
-        valEl.style.fontSize = '10.2pt';
         setAllowWrap(false);
-        setFontPt(10.2);
+        setFontPt(MAX_FONT_PT);
         return;
       }
 
-      valEl.style.whiteSpace = 'nowrap';
-      valEl.style.fontSize = '10.2pt';
-      const avail = Math.max(16, slotW - 10);
-      const needed = valEl.scrollWidth;
-
-      if (needed <= avail) {
+      const avail = Math.max(12, slotW - 10);
+      if (measureTextWidth(clean, MAX_FONT_PT, valEl) <= avail) {
         setAllowWrap(false);
-        setFontPt(10.2);
+        setFontPt(MAX_FONT_PT);
         return;
       }
 
-      let next = Math.max(6.0, Math.min(10.2, (10.2 * (avail - 2)) / needed));
-      valEl.style.fontSize = `${next}pt`;
-      while (next > 6.0 && valEl.scrollWidth > avail) {
-        next = Number(Math.max(6.0, next - 0.2).toFixed(2));
-        valEl.style.fontSize = `${next}pt`;
+      // Find the largest font that still fits on one line.
+      let low = MIN_FONT_PT;
+      let high = MAX_FONT_PT;
+      let best = MIN_FONT_PT;
+      for (let i = 0; i < 14; i += 1) {
+        const mid = Number(((low + high) / 2).toFixed(2));
+        if (measureTextWidth(clean, mid, valEl) <= avail) {
+          best = mid;
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+      best = Math.floor(best * 10) / 10;
+
+      if (measureTextWidth(clean, best, valEl) <= avail) {
+        setAllowWrap(false);
+        setFontPt(best);
+        return;
       }
 
-      if (valEl.scrollWidth > avail) {
-        // Wrap cleanly onto 2 lines at 6.2pt instead of ever cutting off
-        valEl.style.whiteSpace = 'normal';
-        valEl.style.fontSize = '6.2pt';
-        setAllowWrap(true);
-        setFontPt(6.2);
-      } else {
-        setAllowWrap(false);
-        setFontPt(next);
-      }
+      // Even the smallest font cannot fit: wrap and grow instead of clipping.
+      setAllowWrap(true);
+      setFontPt(MIN_FONT_PT);
     };
 
     fitText();
-
     const ro = new ResizeObserver(fitText);
     ro.observe(slotEl);
     return () => ro.disconnect();
@@ -84,6 +111,10 @@ function DottedSlot({
   const style: React.CSSProperties = width
     ? { width, flexShrink: 0 }
     : { flex: flex ?? 1 };
+  if (allowWrap) {
+    style.overflow = 'visible';
+    style.alignItems = 'flex-start';
+  }
 
   return (
     <span
@@ -99,7 +130,10 @@ function DottedSlot({
         style={{
           fontSize: `${fontPt}pt`,
           whiteSpace: allowWrap ? 'normal' : 'nowrap',
-          lineHeight: allowWrap ? 1.05 : 1.15,
+          lineHeight: 1.15,
+          wordBreak: allowWrap ? 'break-word' : 'normal',
+          maxWidth: allowWrap ? '100%' : undefined,
+          minWidth: 0,
         }}
       >
         {value || '\u00A0'}
