@@ -39,7 +39,7 @@ The **Sync** button in the app header opens a panel with two options:
 Use either of these server-side configurations on the Vercel project:
 
 1. **Connection string (preferred)** — create a free Postgres project at https://console.neon.tech, copy its pooled connection string, and set it as `DATABASE_URL`. Replace the placeholder value rather than adding a second variable.
-2. **Neon API key only** — set `NEON_API_KEY` instead. The function discovers the first project/branch, requests a pooled connection URI from Neon's API at runtime, and caches it in the function instance. Optional `NEON_PROJECT_ID`, `NEON_BRANCH`, `NEON_DATABASE`, and `NEON_ROLE` variables can pin the target.
+2. **Neon API key only** — set `NEON_API_KEY` instead. The function discovers the first project/branch, requests a pooled connection URI from Neon's API at runtime, and caches it in the function instance. Optional `NEON_ORG_ID`, `NEON_PROJECT_ID`, `NEON_BRANCH`, `NEON_DATABASE`, and `NEON_ROLE` variables can pin the target.
 
 Redeploy the project after changing environment variables.
 

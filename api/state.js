@@ -23,7 +23,14 @@ async function getConnectionString() {
   const apiKey = process.env.NEON_API_KEY || '';
   if (!apiKey) throw new Error('DATABASE_URL / NEON_API_KEY is not configured');
 
-  const projects = await neonApi('/projects', apiKey);
+  // Neon personal/org keys may require an explicit organization scope.
+  const orgId =
+    process.env.NEON_ORG_ID ||
+    (await neonApi('/users/me/organizations', apiKey)).organizations?.[0]?.id;
+  const projectsPath = orgId
+    ? `/projects?org_id=${encodeURIComponent(orgId)}`
+    : '/projects';
+  const projects = await neonApi(projectsPath, apiKey);
   const project = projects.projects?.[0];
   const projectId = process.env.NEON_PROJECT_ID || project?.id;
   if (!projectId) throw new Error('no Neon project found for this API key');
