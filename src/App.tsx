@@ -15,6 +15,8 @@ import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { AddBankModal } from './components/AddBankModal';
 import { CloudSyncPanel } from './components/CloudSyncPanel';
+import { useAutoSync } from './hooks/useAutoSync';
+import { scheduleAutoPush } from './utils/autoSync';
 import { BankTransferPrintView, BankTransferSheet } from './components/BankTransferSheet';
 import { BillPaymentPrintView, BillPaymentSheet } from './components/BillPaymentSheet';
 import { ChallanPrintView, ChallanSheet } from './components/ChallanSheet';
@@ -258,10 +260,13 @@ export function App() {
     setToast({ message, tone });
   };
 
+  const syncStatus = useAutoSync(showToast);
+
   const persistProfiles = (next: BankProfile[]) => {
     setProfiles(next);
     try {
       localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(next));
+      scheduleAutoPush();
     } catch {
       // Ignore storage quota errors
     }
@@ -271,6 +276,7 @@ export function App() {
     setBillPaymentData(next);
     try {
       localStorage.setItem(STORAGE_KEY_BILL_PAYMENT, JSON.stringify(next));
+      scheduleAutoPush();
     } catch {
       // Ignore storage quota errors
     }
@@ -280,6 +286,7 @@ export function App() {
     setBankTransferData(next);
     try {
       localStorage.setItem(STORAGE_KEY_BANK_TRANSFER, JSON.stringify(next));
+      scheduleAutoPush();
     } catch {
       // Ignore storage quota errors
     }
@@ -289,6 +296,7 @@ export function App() {
     setMonthlyVoucherData(next);
     try {
       localStorage.setItem(STORAGE_KEY_MONTHLY_VOUCHER, JSON.stringify(next));
+      scheduleAutoPush();
     } catch {
       // Ignore storage quota errors
     }
@@ -298,6 +306,7 @@ export function App() {
     setVatChallanData(next);
     try {
       localStorage.setItem(STORAGE_KEY_VAT_CHALLAN, JSON.stringify(next));
+      scheduleAutoPush();
     } catch {
       // Ignore storage quota errors
     }
@@ -307,6 +316,7 @@ export function App() {
     setTaxChallanData(next);
     try {
       localStorage.setItem(STORAGE_KEY_TAX_CHALLAN, JSON.stringify(next));
+      scheduleAutoPush();
     } catch {
       // Ignore storage quota errors
     }
@@ -643,11 +653,33 @@ export function App() {
             <button
               type="button"
               onClick={() => setIsSyncOpen((open) => !open)}
-              title="ডেটা সিঙ্ক"
+              title={`অটো সিঙ্ক: ${
+                syncStatus === 'offline'
+                  ? 'কোড সেট নেই'
+                  : syncStatus === 'syncing'
+                  ? 'চলছে'
+                  : syncStatus === 'error'
+                  ? 'ব্যর্থ'
+                  : syncStatus === 'saved'
+                  ? 'সম্পন্ন'
+                  : 'প্রস্তুত'
+              }`}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[#006633] text-[#006633] text-sm font-semibold hover:bg-[#F0F7F3] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Cloud className="w-4 h-4" />
               <span className="hidden xl:inline">Sync</span>
+              <span
+                aria-hidden="true"
+                className={`w-1.5 h-1.5 rounded-full ${
+                  syncStatus === 'error'
+                    ? 'bg-[#C62828]'
+                    : syncStatus === 'syncing'
+                    ? 'bg-[#D97706]'
+                    : syncStatus === 'offline'
+                    ? 'bg-[#9AA5A0]'
+                    : 'bg-[#16A34A]'
+                }`}
+              />
             </button>
             <button
               type="button"
