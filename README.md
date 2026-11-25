@@ -32,7 +32,7 @@ Repository setting required once: **Settings → Pages → Build and deployment 
 The **Sync** button in the app header opens a panel with two options:
 
 1. **JSON Export / Import** — works immediately, no server needed.
-2. **Cloud sync** — enter the same workspace code on every device. Data is pushed/pulled through the Vercel function in `api/state.js`, stored in a `app_state` table in Neon Postgres. The table is created automatically on first use.
+2. **Cloud sync (auto)** — enter the same workspace code once on every device. After that, every local save is pushed automatically after a short delay, and new data from another device is pulled and reloaded automatically (also on page load, tab focus, and every minute). Manual **এখনই পাঠান / এখনই আনুন** buttons remain available. Data goes through the Vercel function in `api/state.js`, stored in an `app_state` table in Neon Postgres. The table is created automatically on first use. The Sync button shows a small status dot: grey = no code set, amber = syncing, red = failed, green = up to date.
 
 ### One-time Neon setup
 
@@ -43,4 +43,4 @@ Use either of these server-side configurations on the Vercel project:
 
 Redeploy the project after changing environment variables.
 
-The connection string and API key stay server-side only; they are never bundled into the GitHub Pages frontend. Anyone who knows a workspace code can read/write that workspace, so use a long, non-guessable code.
+The connection string and API key stay server-side only; they are never bundled into the GitHub Pages frontend. Anyone who knows a workspace code can read/write that workspace, so use a long, non-guessable code. When two devices edit at the same time, the most recent save wins.

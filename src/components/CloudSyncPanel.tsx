@@ -7,101 +7,66 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { STORAGE_KEY_PROFILES } from '../data/bankDefaults';
 import {
-  STORAGE_KEY_BANK_TRANSFER,
-  STORAGE_KEY_BILL_PAYMENT,
-  STORAGE_KEY_MONTHLY_VOUCHER,
-  STORAGE_KEY_TAX_CHALLAN,
-  STORAGE_KEY_VAT_CHALLAN,
-} from '../data/sheetsDefaults';
-
-const API_URL =
-  import.meta.env.VITE_SYNC_API_URL ||
-  'https://bill-voucher-bkf.vercel.app';
-const SYNC_CODE_KEY = 'billVoucherSyncCode';
-
-const STORAGE_KEYS = [
-  STORAGE_KEY_PROFILES,
-  STORAGE_KEY_BILL_PAYMENT,
-  STORAGE_KEY_BANK_TRANSFER,
-  STORAGE_KEY_MONTHLY_VOUCHER,
-  STORAGE_KEY_VAT_CHALLAN,
-  STORAGE_KEY_TAX_CHALLAN,
-] as const;
-
-type Payload = Record<string, unknown>;
-
-function collectLocalData(): Payload {
-  const payload: Payload = {};
-  for (const key of STORAGE_KEYS) {
-    const raw = localStorage.getItem(key);
-    if (raw !== null) {
-      payload[key] = JSON.parse(raw);
-    }
-  }
-  return payload;
-}
-
-function applyRemoteData(payload: Payload): boolean {
-  const keys = Object.keys(payload);
-  if (keys.length === 0 || !keys.some((key) => STORAGE_KEYS.includes(key as never))) {
-    return false;
-  }
-  for (const key of STORAGE_KEYS) {
-    if (Object.prototype.hasOwnProperty.call(payload, key)) {
-      localStorage.setItem(key, JSON.stringify(payload[key]));
-    }
-  }
-  return true;
-}
+  applyRemoteData,
+  collectLocalData,
+  emitStatus,
+  getLastSyncedAt,
+  getSyncCode,
+  pullAndApply,
+  pushToCloud,
+  reconcileAutoSync,
+  scheduleAutoPush,
+  setSyncCode,
+  type Payload,
+} from '../utils/autoSync';
 
 interface CloudSyncPanelProps {
   onClose: () => void;
   notify: (message: string, tone?: 'success' | 'warning' | 'error') => void;
 }
 
+const formatTime = (at: number | null) =>
+  at ? new Date(at).toLocaleString('bn-BD') : '';
+
 export function CloudSyncPanel({ onClose, notify }: CloudSyncPanelProps) {
-  const [code, setCode] = useState(() => localStorage.getItem(SYNC_CODE_KEY) || '');
+  const [code, setCode] = useState(() => getSyncCode() || '');
   const [busy, setBusy] = useState<'push' | 'pull' | null>(null);
-  const [lastSync, setLastSync] = useState<string>('');
+  const [lastSync, setLastSync] = useState(() => formatTime(getLastSyncedAt(getSyncCode())));
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const firstRun = useRef(true);
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
 
-  const validCode = /^[A-Za-z0-9_-]{4,64}$/.test(code.trim());
+  const trimmedCode = code.trim();
+  const validCode = /^[A-Za-z0-9_-]{4,64}$/.test(trimmedCode);
 
+  // Joining or changing a workspace auto-reconciles after the user stops typing.
   useEffect(() => {
-    const saved = localStorage.getItem(SYNC_CODE_KEY);
-    if (!saved || !/^[A-Za-z0-9_-]{4,64}$/.test(saved)) return;
+    if (!validCode) return;
     let cancelled = false;
-    fetch(`${API_URL}/api/state?code=${encodeURIComponent(saved)}`)
-      .then(async (res) => {
-        if (res.status === 404) return null;
-        if (!res.ok) throw new Error('fetch failed');
-        return res.json();
-      })
-      .then((data: { payload?: Payload; updatedAt?: string } | null) => {
-        if (cancelled || !data?.payload) return;
-        if (applyRemoteData(data.payload)) {
-          setLastSync(
-            data.updatedAt ? new Date(data.updatedAt).toLocaleString('bn-BD') : '',
-          );
-          window.location.reload();
-        }
-      })
-      .catch(() => {
-        // Silent auto-load failure; user can retry from the panel.
-      });
+    const delay = firstRun.current ? 0 : 800;
+    firstRun.current = false;
+    const timer = window.setTimeout(async () => {
+      const result = await reconcileAutoSync(trimmedCode);
+      if (cancelled) return;
+      setLastSync(formatTime(getLastSyncedAt(trimmedCode)));
+      if (result === 'pulled') {
+        notifyRef.current('ক্লাউডের ডেটা লোড হয়েছে—পেইজ রিফ্রেশ হচ্ছে…');
+        window.setTimeout(() => window.location.reload(), 500);
+      }
+    }, delay);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [trimmedCode, validCode]);
 
   const saveCode = (value: string) => {
     setCode(value);
-    const trimmed = value.trim();
-    if (/^[A-Za-z0-9_-]{4,64}$/.test(trimmed)) {
-      localStorage.setItem(SYNC_CODE_KEY, trimmed);
-    }
+    setSyncCode(value);
+    setLastSync(formatTime(getLastSyncedAt(value.trim())));
+    if (!/^[A-Za-z0-9_-]{4,64}$/.test(value.trim())) emitStatus('offline');
   };
 
   const push = async () => {
@@ -111,15 +76,8 @@ export function CloudSyncPanel({ onClose, notify }: CloudSyncPanelProps) {
     }
     setBusy('push');
     try {
-      const res = await fetch(`${API_URL}/api/state`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim(), payload: collectLocalData() }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'push failed');
-      }
+      await pushToCloud(trimmedCode);
+      setLastSync(formatTime(Date.now()));
       notify('ডেটা ক্লাউডে সেভ হয়েছে ✅');
     } catch {
       notify('ক্লাউডে সেভ করা যায়নি। Neon connection চেক করুন।', 'error');
@@ -135,18 +93,12 @@ export function CloudSyncPanel({ onClose, notify }: CloudSyncPanelProps) {
     }
     setBusy('pull');
     try {
-      const res = await fetch(
-        `${API_URL}/api/state?code=${encodeURIComponent(code.trim())}`,
-      );
-      if (res.status === 404) {
+      const remote = await pullAndApply(trimmedCode);
+      if (!remote) {
         notify('এই কোডে ক্লাউডে কোনো ডেটা নেই', 'warning');
         return;
       }
-      if (!res.ok) throw new Error('pull failed');
-      const data = await res.json();
-      if (!applyRemoteData(data.payload)) {
-        throw new Error('invalid payload');
-      }
+      setLastSync(formatTime(Date.now()));
       notify('ডেটা লোড হয়েছে—পেইজ রিফ্রেশ হচ্ছে…');
       window.setTimeout(() => window.location.reload(), 500);
     } catch {
@@ -176,7 +128,14 @@ export function CloudSyncPanel({ onClose, notify }: CloudSyncPanelProps) {
       if (!applyRemoteData(payload)) {
         throw new Error('invalid file');
       }
-      notify('ফাইল ইমপোর্ট হয়েছে—পেইজ রিফ্রেশ হচ্ছে…');
+      notify('ফাইল ইমপোর্ট হয়েছে—অটো-সিঙ্ক চলছে…');
+      if (validCode) {
+        void pushToCloud(trimmedCode)
+          .then(() => setLastSync(formatTime(Date.now())))
+          .catch(() => notify('ক্লাউডে আপলোড করা যায়নি', 'error'));
+      } else {
+        scheduleAutoPush();
+      }
       window.setTimeout(() => window.location.reload(), 500);
     } catch {
       notify('এই JSON ফাইলটি বৈধ নয়', 'error');
@@ -209,6 +168,11 @@ export function CloudSyncPanel({ onClose, notify }: CloudSyncPanelProps) {
         placeholder="উদাহরণ: bkf-forms-2026"
         className="w-full rounded-md border border-[#DCE3DF] px-3 py-2 text-sm outline-none focus:border-[#006633]"
       />
+      <p className="mt-1 text-[11px] text-[#66736C]">
+        {validCode
+          ? 'অটো সিঙ্ক চালু: সেভ করলেই ক্লাউডে যাবে, অন্য ডিভাইসের নতুন ডেটাও এসে যাবে।'
+          : 'কোড দিলেই অটো সিঙ্ক চালু হয়ে যাবে।'}
+      </p>
       {lastSync && (
         <p className="mt-1 text-[11px] text-[#66736C]">শেষ সিঙ্ক: {lastSync}</p>
       )}
@@ -221,7 +185,7 @@ export function CloudSyncPanel({ onClose, notify }: CloudSyncPanelProps) {
           className="inline-flex items-center justify-center gap-1.5 rounded-md bg-[#006633] text-white px-3 py-2 text-xs font-semibold hover:bg-[#004E27] disabled:opacity-60 cursor-pointer"
         >
           <CloudUpload className="w-4 h-4" />
-          {busy === 'push' ? 'সেভ হচ্ছে…' : 'ক্লাউডে পাঠান'}
+          {busy === 'push' ? 'সেভ হচ্ছে…' : 'এখনই পাঠান'}
         </button>
         <button
           type="button"
@@ -230,7 +194,7 @@ export function CloudSyncPanel({ onClose, notify }: CloudSyncPanelProps) {
           className="inline-flex items-center justify-center gap-1.5 rounded-md border border-[#006633] text-[#006633] px-3 py-2 text-xs font-semibold hover:bg-[#F0F7F3] disabled:opacity-60 cursor-pointer"
         >
           <CloudDownload className="w-4 h-4" />
-          {busy === 'pull' ? 'লোড হচ্ছে…' : 'ক্লাউড থেকে আনুন'}
+          {busy === 'pull' ? 'লোড হচ্ছে…' : 'এখনই আনুন'}
         </button>
       </div>
 
