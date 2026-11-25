@@ -11,8 +11,11 @@ import {
   X,
 } from 'lucide-react';
 import {
+  addSheetAmount,
   BillPaymentRow,
   BillPaymentSheetData,
+  BILL_PAYMENT_STAFF_CATALOG,
+  BILL_PAYMENT_TT_CATALOG,
   computeBillPaymentTotals,
   DEFAULT_BILL_PAYMENT_DATA,
   formatRawOrComma,
@@ -291,7 +294,7 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
     return () => ro.disconnect();
   }, [viewMode]);
 
-  // Sync draft when dropdown selection changes
+  // Draft amounts are always empty; previously saved amounts stay in the table.
   const handleSelectRowId = (id: string) => {
     setSelectedRowId(id);
     setVoucherAmount('');
@@ -306,9 +309,32 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
         vo5: '',
         ok: false,
       });
-    } else {
-      const found = data.rows.find((r) => r.id === id);
-      if (found) setRowDraft({ ...found });
+      return;
+    }
+    if (id.startsWith('catalog:')) {
+      setRowDraft({
+        id: '',
+        name: id.slice('catalog:'.length),
+        vo1: '',
+        vo2: '',
+        vo3: '',
+        vo4: '',
+        vo5: '',
+        ok: false,
+      });
+      return;
+    }
+    const found = data.rows.find((r) => r.id === id);
+    if (found) {
+      setRowDraft({
+        ...found,
+        vo1: '',
+        vo2: '',
+        vo3: '',
+        vo4: '',
+        vo5: '',
+        extraVos: undefined,
+      });
     }
   };
 
@@ -316,10 +342,14 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
     setSelectedTTId(id);
     if (!id || id === '__NEW__') {
       setTTDraft({ id: '', label: '', amount: '' });
-    } else {
-      const found = data.ttItems.find((t) => t.id === id);
-      if (found) setTTDraft({ ...found });
+      return;
     }
+    if (id.startsWith('catalog:')) {
+      setTTDraft({ id: '', label: id.slice('catalog:'.length), amount: '' });
+      return;
+    }
+    const found = data.ttItems.find((t) => t.id === id);
+    if (found) setTTDraft({ ...found, amount: '' });
   };
 
   const handleSelectSection = (sec: string) => {
@@ -348,8 +378,14 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
     }
 
     const entered = voucherAmount.trim();
+    const isNewEntry = selectedRowId === '__NEW__' || selectedRowId.startsWith('catalog:');
+    const existingByName = isNewEntry
+      ? data.rows.find(
+          (r) => r.name.trim().toLowerCase() === rowDraft.name.trim().toLowerCase()
+        )
+      : undefined;
 
-    if (selectedRowId === '__NEW__') {
+    if (isNewEntry && !existingByName) {
       const created: BillPaymentRow = {
         id: `bp-${Date.now()}`,
         name: rowDraft.name.trim(),
@@ -363,7 +399,8 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
       onChange({ ...data, rows: [...data.rows, created] });
       setFeedback(`'${created.name}' টেবিলে যোগ ও সেভ হয়েছে!`);
     } else {
-      const current = data.rows.find((r) => r.id === selectedRowId) || rowDraft;
+      const targetId = existingByName?.id ?? selectedRowId;
+      const current = data.rows.find((r) => r.id === targetId) || rowDraft;
       let updatedRow: BillPaymentRow = {
         ...current,
         name: current.name.trim(),
@@ -380,7 +417,7 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
         updatedRow = setRowVoValue(updatedRow, targetIndex, mergedValue);
       }
 
-      const updatedRows = data.rows.map((r) => (r.id === selectedRowId ? updatedRow : r));
+      const updatedRows = data.rows.map((r) => (r.id === targetId ? updatedRow : r));
       onChange({ ...data, rows: updatedRows });
       setFeedback(`'${updatedRow.name}' আপডেট ও সেভ হয়েছে!`);
     }
@@ -410,7 +447,13 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
       setFeedback('অনুগ্রহ করে T,T খাতের নাম লিখুন।');
       return;
     }
-    if (selectedTTId === '__NEW__') {
+    const isNewEntry = selectedTTId === '__NEW__' || selectedTTId.startsWith('catalog:');
+    const existingByLabel = isNewEntry
+      ? data.ttItems.find(
+          (t) => t.label.trim().toLowerCase() === ttDraft.label.trim().toLowerCase()
+        )
+      : undefined;
+    if (isNewEntry && !existingByLabel) {
       const created: TTItem = {
         id: `tt-${Date.now()}`,
         label: ttDraft.label.trim(),
@@ -422,8 +465,12 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
       onChange({
         ...data,
         ttItems: data.ttItems.map((it) =>
-          it.id === selectedTTId
-            ? { ...ttDraft, label: ttDraft.label.trim() }
+          it.id === (existingByLabel?.id ?? selectedTTId)
+            ? {
+                ...it,
+                label: ttDraft.label.trim(),
+                amount: addSheetAmount(it.amount, ttDraft.amount),
+              }
             : it
         ),
       });
@@ -445,8 +492,8 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
     e.preventDefault();
     onChange({
       ...data,
-      salary: salaryDraft || data.salary,
-      others: othersDraft || data.others,
+      salary: addSheetAmount(data.salary, salaryDraft),
+      others: addSheetAmount(data.others, othersDraft),
     });
     setSalaryDraft('');
     setOthersDraft('');
@@ -465,7 +512,7 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
       const fallback = nextRows[0];
       if (fallback) {
         setSelectedRowId(fallback.id);
-        setRowDraft({ ...fallback });
+        setRowDraft({ ...fallback, vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', extraVos: undefined });
       } else {
         setSelectedRowId('__NEW__');
         setRowDraft({ id: '', name: '', vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', ok: false });
@@ -481,7 +528,7 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
       const fallback = nextTT[0];
       if (fallback) {
         setSelectedTTId(fallback.id);
-        setTTDraft({ ...fallback });
+        setTTDraft({ ...fallback, amount: '' });
       } else {
         setSelectedTTId('__NEW__');
         setTTDraft({ id: '', label: '', amount: '' });
@@ -498,7 +545,7 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
       rows: data.rows.map((r) => (r.id === editingRowModal.id ? editingRowModal : r)),
     });
     if (selectedRowId === editingRowModal.id) {
-      setRowDraft({ ...editingRowModal });
+      setRowDraft({ ...editingRowModal, vo1: '', vo2: '', vo3: '', vo4: '', vo5: '', extraVos: undefined });
     }
     setEditingRowModal(null);
     setFeedback('তথ্য আপডেট হয়েছে!');
@@ -512,7 +559,7 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
       ttItems: data.ttItems.map((t) => (t.id === editingTTModal.id ? editingTTModal : t)),
     });
     if (selectedTTId === editingTTModal.id) {
-      setTTDraft({ ...editingTTModal });
+      setTTDraft({ ...editingTTModal, amount: '' });
     }
     setEditingTTModal(null);
     setFeedback('T,T তথ্য আপডেট হয়েছে!');
@@ -531,10 +578,10 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
   };
 
   const draftVoValues = getRowVoValues(rowDraft);
-  const existingRowTotal = draftVoValues.reduce(
-    (acc, value) => acc + parseSheetNum(value),
-    0
-  );
+  const selectedTableRow = data.rows.find((r) => r.id === selectedRowId);
+  const existingRowTotal = selectedTableRow
+    ? getRowVoValues(selectedTableRow).reduce((acc, value) => acc + parseSheetNum(value), 0)
+    : 0;
   const rowDraftTotal = existingRowTotal + parseSheetNum(voucherAmount);
   const nextVoIndex = getNextVoIndex(rowDraft);
   const nextSlotLabel = `${getVoLabel(nextVoIndex)}${
@@ -639,12 +686,12 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
                   options={[
                     {
                       value: 'BILL_ROW',
-                      label: '1. Bill Payment (Name & Voucher Entry)',
+                      label: 'Staff Payment',
                       keywords: 'bill payment name voucher',
                     },
                     {
                       value: 'TT_ITEM',
-                      label: '2. T,T Section (Deduction / S/c / Gratuity / Vat+Tax)',
+                      label: 'Deduction / S/c / Gratuity / Vat+Tax',
                       keywords: 'tt deduction sc stationary gratuity earn leave vat tax',
                     },
                     {
@@ -687,6 +734,15 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
                     <SearchableSelect
                       options={[
                         ...data.rows.map((r) => ({ value: r.id, label: r.name })),
+                        ...BILL_PAYMENT_STAFF_CATALOG.filter(
+                          (name) =>
+                            !data.rows.some(
+                              (r) => r.name.trim().toLowerCase() === name.toLowerCase()
+                            )
+                        ).map((name) => ({
+                          value: `catalog:${name}`,
+                          label: name,
+                        })),
                         {
                           value: '__NEW__',
                           label: '+ নতুন নাম যোগ করুন (New Row)',
@@ -804,6 +860,15 @@ export const BillPaymentSheet: React.FC<BillPaymentSheetProps> = ({
                     <SearchableSelect
                       options={[
                         ...data.ttItems.map((t) => ({ value: t.id, label: t.label })),
+                        ...BILL_PAYMENT_TT_CATALOG.filter(
+                          (label) =>
+                            !data.ttItems.some(
+                              (t) => t.label.trim().toLowerCase() === label.toLowerCase()
+                            )
+                        ).map((label) => ({
+                          value: `catalog:${label}`,
+                          label,
+                        })),
                         {
                           value: '__NEW__',
                           label: '+ নতুন T,T খাত যোগ করুন',

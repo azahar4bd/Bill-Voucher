@@ -47,7 +47,9 @@ import {
   DEFAULT_TAX_CHALLAN_DATA,
   DEFAULT_VAT_CHALLAN_DATA,
   fixGratuitySpellingInText,
+  getRowVoValues,
   MonthlyVoucherSheetData,
+  parseSheetNum,
   STORAGE_KEY_BANK_TRANSFER,
   STORAGE_KEY_BILL_PAYMENT,
   STORAGE_KEY_MONTHLY_VOUCHER,
@@ -89,6 +91,20 @@ interface ToastState {
   tone: 'success' | 'warning' | 'error';
 }
 
+function normalizeBankBlock(block: BankTransferBlock): BankTransferBlock {
+  const legacy = block.accountName || '';
+  if (legacy.includes('Gratuity')) {
+    return { ...block, bankName: 'Bank Asia PLC-Gratuity', accountName: '' };
+  }
+  if (/PF/i.test(legacy)) {
+    return { ...block, bankName: 'UCBL PLC-pf', accountName: '' };
+  }
+  if (legacy.includes('Bandhu Kallyan Foundation')) {
+    return { ...block, bankName: 'Bank Asia PLC-48', accountName: '' };
+  }
+  return block;
+}
+
 export function App() {
   const [profiles, setProfiles] = useState<BankProfile[]>(loadInitialProfiles);
   const [selectedProfileName, setSelectedProfileName] = useState<string>('');
@@ -106,28 +122,50 @@ export function App() {
     const loaded = loadStoredJson(STORAGE_KEY_BILL_PAYMENT, DEFAULT_BILL_PAYMENT_DATA);
     return {
       ...loaded,
-      ttItems: loaded.ttItems.map((item) => ({
-        ...item,
-        label: fixGratuitySpellingInText(item.label),
-      })),
+      rows: loaded.rows.filter((r) =>
+        getRowVoValues(r).some((v) => parseSheetNum(v) !== 0)
+      ),
+      ttItems: loaded.ttItems
+        .map((item) => ({
+          ...item,
+          label: fixGratuitySpellingInText(item.label),
+        }))
+        .filter((item) => parseSheetNum(item.amount) !== 0),
     };
   });
   const [bankTransferData, setBankTransferData] = useState<BankTransferSheetData>(() => {
     const loaded = loadStoredJson(STORAGE_KEY_BANK_TRANSFER, DEFAULT_BANK_TRANSFER_DATA);
     return {
       ...loaded,
-      blocks: loaded.blocks.map((block) => ({
-        ...block,
-        accountName: fixGratuitySpellingInText(block.accountName),
-        items: block.items.map((item) => ({
-          ...item,
-          description: fixGratuitySpellingInText(item.description),
-        })),
-      })),
+      blocks: loaded.blocks
+        .map((block) => ({
+          ...normalizeBankBlock(block),
+          items: block.items
+            .map((item) => ({
+              ...item,
+              description: fixGratuitySpellingInText(item.description),
+            }))
+            .filter(
+              (item) =>
+                parseSheetNum(item.amount) !== 0 || item.description.trim() !== ''
+            ),
+        }))
+        .filter((block) => block.items.length > 0),
     };
   });
   const [monthlyVoucherData, setMonthlyVoucherData] = useState<MonthlyVoucherSheetData>(() => {
-    const loaded = loadStoredJson(STORAGE_KEY_MONTHLY_VOUCHER, DEFAULT_MONTHLY_VOUCHER_DATA);
+    const stored = loadStoredJson(STORAGE_KEY_MONTHLY_VOUCHER, DEFAULT_MONTHLY_VOUCHER_DATA);
+    const loaded: MonthlyVoucherSheetData = {
+      ...stored,
+      headRates: stored.headRates ?? {},
+      rows: stored.rows.filter(
+        (r) =>
+          parseSheetNum(r.totalVoucher) !== 0 ||
+          parseSheetNum(r.preAmount) !== 0 ||
+          parseSheetNum(r.vatManual) !== 0 ||
+          parseSheetNum(r.taxManual) !== 0
+      ),
+    };
     const syncFlagKey = 'sonaliStudio_mv_challanRatesSynced_v3';
     const alreadySynced = (() => {
       try {
@@ -652,7 +690,7 @@ export function App() {
 
         {/* Main Workspace */}
         {activePage === 'BILL_PAYMENT' && (
-          <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5">
+          <main className="app-workspace compact-ui flex-1 max-w-[1600px] w-full mx-auto px-3 lg:px-5 py-3">
             <BillPaymentSheet
               data={billPaymentData}
               onChange={updateBillPaymentData}
@@ -663,7 +701,7 @@ export function App() {
         )}
 
         {activePage === 'BANK_TRANSFER' && (
-          <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5">
+          <main className="app-workspace compact-ui flex-1 max-w-[1600px] w-full mx-auto px-3 lg:px-5 py-3">
             <BankTransferSheet
               data={bankTransferData}
               profiles={profiles}
@@ -676,7 +714,7 @@ export function App() {
         )}
 
         {activePage === 'MONTHLY_VOUCHER' && (
-          <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5">
+          <main className="app-workspace compact-ui flex-1 max-w-[1600px] w-full mx-auto px-3 lg:px-5 py-3">
             <MonthlyVoucherSheet
               data={monthlyVoucherData}
               onChange={updateMonthlyVoucherData}
@@ -687,7 +725,7 @@ export function App() {
         )}
 
         {activePage === 'VAT_CHALLAN' && (
-          <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5">
+          <main className="app-workspace compact-ui flex-1 max-w-[1600px] w-full mx-auto px-3 lg:px-5 py-3">
             <ChallanSheet
               mode="VAT"
               data={vatChallanData}
@@ -700,7 +738,7 @@ export function App() {
         )}
 
         {activePage === 'TAX_CHALLAN' && (
-          <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5">
+          <main className="app-workspace compact-ui flex-1 max-w-[1600px] w-full mx-auto px-3 lg:px-5 py-3">
             <ChallanSheet
               mode="TAX"
               data={taxChallanData}
@@ -713,7 +751,7 @@ export function App() {
         )}
 
         {(activePage === 'BEFTN' || activePage === 'RTGS') && (
-          <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 lg:px-6 py-5 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+          <main className="app-workspace compact-ui flex-1 max-w-[1600px] w-full mx-auto px-3 lg:px-5 py-3 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
           {/* Mobile / Tablet Form Entry vs A4 Preview Switcher */}
           <div className="xl:hidden col-span-1 flex items-center gap-1 p-1 bg-white border border-[#DCE3DF] rounded-lg w-fit">
             <button

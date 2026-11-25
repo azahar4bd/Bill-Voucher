@@ -16,12 +16,15 @@ import {
   X,
 } from 'lucide-react';
 import {
+  addSheetAmount,
   CHALLAN_ROW_MAPPINGS,
   computeMonthlyVoucherRow,
   computeMonthlyVoucherTotals,
   DEFAULT_MONTHLY_VOUCHER_DATA,
   formatSheetNum,
+  MONTHLY_VOUCHER_HEAD_CATALOG,
   MONTH_OPTIONS,
+  MonthlyVoucherHeadRate,
   MonthlyVoucherRow,
   MonthlyVoucherSheetData,
   resequenceMonthlyVoucherRows,
@@ -179,6 +182,26 @@ function emptyRowDraft(nextSl: string): MonthlyVoucherRow {
   };
 }
 
+/** The amount box is always empty — saved amounts stay in the table only. */
+function draftFromHead(
+  head: MonthlyVoucherRow,
+  headRates: Record<string, MonthlyVoucherHeadRate> = {},
+  slNo = ''
+): MonthlyVoucherRow {
+  const saved = headRates[head.id];
+  return {
+    ...head,
+    slNo: slNo || head.slNo,
+    vatRate: saved?.vatRate ?? head.vatRate,
+    taxRate: saved?.taxRate ?? head.taxRate,
+    fixedVatTaxBase: saved?.fixedVatTaxBase ?? head.fixedVatTaxBase,
+    totalVoucher: '',
+    preAmount: '',
+    vatManual: '',
+    taxManual: '',
+  };
+}
+
 export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
   data,
   onChange,
@@ -219,11 +242,20 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
     return () => ro.disconnect();
   }, [viewMode]);
 
-  const headOptions = useMemo(
-    () => [
-      ...data.rows.map((r) => ({
+  const headOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const heads = [
+      ...data.rows,
+      ...MONTHLY_VOUCHER_HEAD_CATALOG.filter((h) => !data.rows.some((r) => r.id === h.id)),
+    ].filter((h) => {
+      if (seen.has(h.id)) return false;
+      seen.add(h.id);
+      return true;
+    });
+    return [
+      ...heads.map((r) => ({
         value: r.id,
-        label: `${r.slNo}. ${r.particulars || 'Unnamed'} (${r.codeNo || '-'})`,
+        label: `${r.slNo || heads.indexOf(r) + 1}. ${r.particulars || 'Unnamed'} (${r.codeNo || '-'})`,
         keywords: `${r.slNo} ${r.particulars} ${r.codeNo} ${r.codeNo.replace(/,/g, '')}`,
       })),
       {
@@ -231,24 +263,39 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
         label: '+ নতুন খাত যোগ করুন (New Particular)',
         keywords: 'new add particular নতুন খাত',
       },
-    ],
-    [data.rows]
-  );
+    ];
+  }, [data.rows]);
 
   const monthOptions = useMemo(
     () => MONTH_OPTIONS.map((m) => ({ value: m, label: m })),
     []
   );
 
+  const findHead = (id: string): MonthlyVoucherRow | undefined =>
+    data.rows.find((r) => r.id === id) ||
+    MONTHLY_VOUCHER_HEAD_CATALOG.find(
+      (r) => r.id === id || r.codeNo.replace(/,/g, '') === id.replace(/,/g, '')
+    );
+
   const handleSelectRow = (id: string) => {
     setSelectedRowId(id);
     if (!id) {
       setRowDraft(emptyRowDraft(''));
-    } else if (id === '__NEW__') {
+      return;
+    }
+    if (id === '__NEW__') {
       setRowDraft(emptyRowDraft(String(data.rows.length + 1)));
-    } else {
-      const found = data.rows.find((r) => r.id === id);
-      if (found) setRowDraft({ ...found });
+      return;
+    }
+    const head = findHead(id);
+    if (head) {
+      setRowDraft(
+        draftFromHead(
+          head,
+          data.headRates,
+          data.rows.find((r) => r.id === id)?.slNo || String(data.rows.length + 1)
+        )
+      );
     }
   };
 
@@ -263,28 +310,58 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
       return;
     }
 
-    if (selectedRowId === '__NEW__') {
-      const created: MonthlyVoucherRow = {
-        ...rowDraft,
-        id: `mv-${Date.now()}`,
+    const cleanCode = rowDraft.codeNo.replace(/,/g, '').trim();
+    const matched =
+      selectedRowId === '__NEW__'
+        ? undefined
+        : data.rows.find(
+            (r) =>
+              r.id === selectedRowId ||
+              (cleanCode !== '' && r.codeNo.replace(/,/g, '').trim() === cleanCode) ||
+              r.particulars.trim().toLowerCase() === rowDraft.particulars.trim().toLowerCase()
+          );
+
+    if (matched) {
+      const updated: MonthlyVoucherRow = {
+        ...matched,
         particulars: rowDraft.particulars.trim(),
+        codeNo: rowDraft.codeNo,
+        vatRate: rowDraft.vatRate || matched.vatRate,
+        taxRate: rowDraft.taxRate || matched.taxRate,
+        fixedVatTaxBase: rowDraft.fixedVatTaxBase || matched.fixedVatTaxBase,
+        totalVoucher: addSheetAmount(matched.totalVoucher, rowDraft.totalVoucher),
+        preAmount: addSheetAmount(matched.preAmount, rowDraft.preAmount),
+        vatManual: addSheetAmount(matched.vatManual, rowDraft.vatManual),
+        taxManual: addSheetAmount(matched.taxManual, rowDraft.taxManual),
       };
-      const nextRows = resequenceMonthlyVoucherRows([...data.rows, created]);
-      onChange({ ...data, rows: nextRows });
-      setFeedback(`'${created.particulars}' টেবিলে যোগ ও সেভ হয়েছে!`);
-    } else {
       onChange({
         ...data,
-        rows: data.rows.map((r) =>
-          r.id === selectedRowId
-            ? { ...rowDraft, particulars: rowDraft.particulars.trim() }
-            : r
+        rows: resequenceMonthlyVoucherRows(
+          data.rows.map((r) => (r.id === matched.id ? updated : r))
         ),
       });
-      setFeedback(`'${rowDraft.particulars.trim()}' আপডেট ও সেভ হয়েছে!`);
+      setFeedback(`'${updated.particulars}' আগের amount-এ সাথে নতুন amount যোগ করা হয়েছে!`);
+    } else {
+      const head = selectedRowId !== '__NEW__' ? findHead(selectedRowId) : undefined;
+      const created: MonthlyVoucherRow = {
+        ...(head ?? emptyRowDraft(String(data.rows.length + 1))),
+        ...rowDraft,
+        id: head ? head.id : `mv-${Date.now()}`,
+        slNo: String(data.rows.length + 1),
+        particulars: rowDraft.particulars.trim(),
+        totalVoucher: addSheetAmount('', rowDraft.totalVoucher),
+        preAmount: addSheetAmount('', rowDraft.preAmount),
+        vatManual: addSheetAmount('', rowDraft.vatManual),
+        taxManual: addSheetAmount('', rowDraft.taxManual),
+      };
+      onChange({
+        ...data,
+        rows: resequenceMonthlyVoucherRows([...data.rows, created]),
+      });
+      setFeedback(`'${created.particulars}' টেবিলে যোগ ও সেভ হয়েছে!`);
     }
 
-    // Clear all entry fields and dropdown after Save
+    // Amount boxes stay empty; the saved amount lives only in the table.
     setSelectedRowId('');
     setRowDraft(emptyRowDraft(''));
   };
@@ -301,12 +378,23 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
     }));
   };
 
+  // The rate manager covers the head catalog too, even before a head has an amount.
+  const rateRows = useMemo(() => {
+    const ids = new Set<string>();
+    return [...MONTHLY_VOUCHER_HEAD_CATALOG, ...data.rows].filter((r) => {
+      if (ids.has(r.id)) return false;
+      ids.add(r.id);
+      return true;
+    });
+  }, [data.rows]);
+
   const openRateModal = (mode: 'VAT' | 'TAX') => {
     const initialMap: Record<string, string> = {};
     const initialFixedMap: Record<string, string> = {};
-    data.rows.forEach((r) => {
-      initialMap[r.id] = mode === 'VAT' ? r.vatRate : r.taxRate;
-      initialFixedMap[r.id] = r.fixedVatTaxBase ?? '';
+    rateRows.forEach((r) => {
+      const saved = data.headRates?.[r.id];
+      initialMap[r.id] = mode === 'VAT' ? (saved?.vatRate ?? r.vatRate) : (saved?.taxRate ?? r.taxRate);
+      initialFixedMap[r.id] = saved?.fixedVatTaxBase ?? r.fixedVatTaxBase ?? '';
     });
     setRateDraftMap(initialMap);
     setFixedBaseDraftMap(initialFixedMap);
@@ -316,6 +404,24 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
   const handleSaveRates = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manageRateMode) return;
+    const catalogIds = new Set(MONTHLY_VOUCHER_HEAD_CATALOG.map((r) => r.id));
+    const nextHeadRates: Record<string, MonthlyVoucherHeadRate> = { ...(data.headRates ?? {}) };
+
+    rateRows.forEach((r) => {
+      if (!catalogIds.has(r.id)) return;
+      const previous = nextHeadRates[r.id] ?? {
+        vatRate: r.vatRate,
+        taxRate: r.taxRate,
+        fixedVatTaxBase: r.fixedVatTaxBase,
+      };
+      nextHeadRates[r.id] = {
+        ...previous,
+        vatRate: manageRateMode === 'VAT' ? (rateDraftMap[r.id] ?? '').trim() : previous.vatRate,
+        taxRate: manageRateMode === 'TAX' ? (rateDraftMap[r.id] ?? '').trim() : previous.taxRate,
+        fixedVatTaxBase: (fixedBaseDraftMap[r.id] ?? '').trim(),
+      };
+    });
+
     const nextRows = data.rows.map((r) => {
       const nextRate = (rateDraftMap[r.id] ?? '').trim();
       const nextFixedBase = (fixedBaseDraftMap[r.id] ?? '').trim();
@@ -334,7 +440,7 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
         fixedVatTaxBase: nextFixedBase,
       };
     });
-    onChange({ ...data, rows: nextRows });
+    onChange({ ...data, rows: nextRows, headRates: nextHeadRates });
     const synced = nextRows.find((r) => r.id === selectedRowId);
     if (synced) {
       setRowDraft((prev) => ({
@@ -1337,7 +1443,7 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {data.rows.map((r) => {
+                  {rateRows.map((r) => {
                     const rateVal = rateDraftMap[r.id] ?? '';
                     const fixedBaseVal = fixedBaseDraftMap[r.id] ?? '';
                     const previewRow: MonthlyVoucherRow =
@@ -1417,7 +1523,10 @@ export const MonthlyVoucherSheet: React.FC<MonthlyVoucherSheetProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const synced = syncMonthlyVoucherRatesFromChallan(data.rows, true);
+                  const synced = syncMonthlyVoucherRatesFromChallan(
+                    MONTHLY_VOUCHER_HEAD_CATALOG,
+                    true
+                  );
                   const nextMap: Record<string, string> = {};
                   const nextFixedMap: Record<string, string> = { ...fixedBaseDraftMap };
                   synced.forEach((r) => {

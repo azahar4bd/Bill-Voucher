@@ -356,3 +356,72 @@
     box-shadow: none !important;
   }
 }
+
+/* =========================================================
+   Compact entry workspace
+   Desktop: label + field on one line. Mobile: stacked, easy to tap.
+   ========================================================= */
+.app-workspace section {
+  padding: 0.85rem !important;
+}
+
+.app-workspace .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.85rem !important;
+}
+
+.app-workspace form .grid > div {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .app-workspace form .grid > div {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .app-workspace form .grid > div > label {
+    margin: 0 !important;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .app-workspace form .grid > div > div.relative,
+  .app-workspace form .grid > div > [role='combobox'] {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .app-workspace form input[type='text'],
+  .app-workspace form input[type='number'],
+  .app-workspace form input[type='date'],
+  .app-workspace form [role='combobox'] {
+    font-size: 0.8rem !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  .app-workspace form button[type='submit'] {
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-workspace {
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+  }
+
+  .app-workspace section {
+    padding: 0.7rem !important;
+  }
+
+  .app-workspace form input[type='text'],
+  .app-workspace form input[type='number'],
+  .app-workspace form input[type='date'] {
+    font-size: 16px !important;
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+  }
+}
