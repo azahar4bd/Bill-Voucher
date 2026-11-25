@@ -36,8 +36,11 @@ The **Sync** button in the app header opens a panel with two options:
 
 ### One-time Neon setup
 
-1. Create a free Postgres project at https://console.neon.tech and copy its pooled connection string.
-2. In the Vercel project **bill-voucher-sync**, open **Settings → Environment Variables** and replace `DATABASE_URL` with that connection string.
-3. Redeploy the project so the new value is picked up.
+Use either of these server-side configurations on the Vercel project:
 
-The connection string stays server-side only; it is never bundled into the GitHub Pages frontend. Anyone who knows a workspace code can read/write that workspace, so use a long, non-guessable code.
+1. **Connection string (preferred)** — create a free Postgres project at https://console.neon.tech, copy its pooled connection string, and set it as `DATABASE_URL`. Replace the placeholder value rather than adding a second variable.
+2. **Neon API key only** — set `NEON_API_KEY` instead. The function discovers the first project/branch, requests a pooled connection URI from Neon's API at runtime, and caches it in the function instance. Optional `NEON_PROJECT_ID`, `NEON_BRANCH`, `NEON_DATABASE`, and `NEON_ROLE` variables can pin the target.
+
+Redeploy the project after changing environment variables.
+
+The connection string and API key stay server-side only; they are never bundled into the GitHub Pages frontend. Anyone who knows a workspace code can read/write that workspace, so use a long, non-guessable code.
