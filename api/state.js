@@ -1,7 +1,74 @@
-function getConnectionConfig() {
-  const connectionString = process.env.DATABASE_URL || '';
-  if (!connectionString) return null;
+const NEON_API_BASE = 'https://console.neon.tech/api/v2';
+let cachedConnectionString = '';
 
+async function neonApi(path, apiKey) {
+  const response = await fetch(`${NEON_API_BASE}${path}`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Neon API ${response.status}: ${await response.text()}`);
+  }
+  return response.json();
+}
+
+/** DATABASE_URL is preferred; otherwise derive it from the server-only Neon API key. */
+async function getConnectionString() {
+  const direct = process.env.DATABASE_URL || '';
+  if (direct && !direct.startsWith('REPLACE_')) return direct;
+  if (cachedConnectionString) return cachedConnectionString;
+
+  const apiKey = process.env.NEON_API_KEY || '';
+  if (!apiKey) throw new Error('DATABASE_URL / NEON_API_KEY is not configured');
+
+  // Neon personal/org keys may require an explicit organization scope.
+  const orgId =
+    process.env.NEON_ORG_ID ||
+    (await neonApi('/users/me/organizations', apiKey)).organizations?.[0]?.id;
+  const projectsPath = orgId
+    ? `/projects?org_id=${encodeURIComponent(orgId)}`
+    : '/projects';
+  const projects = await neonApi(projectsPath, apiKey);
+  const project = projects.projects?.[0];
+  const projectId = process.env.NEON_PROJECT_ID || project?.id;
+  if (!projectId) throw new Error('no Neon project found for this API key');
+
+  const branches = await neonApi(`/projects/${encodeURIComponent(projectId)}/branches`, apiKey);
+  const branch =
+    branches.branches?.find((b) => b.name === (process.env.NEON_BRANCH || 'main')) ||
+    branches.branches?.[0];
+  const branchId = branch?.id;
+  if (!branchId) throw new Error('no Neon branch found');
+
+  const details = await neonApi(
+    `/projects/${encodeURIComponent(projectId)}/branches/${encodeURIComponent(branchId)}`,
+    apiKey
+  );
+  const database =
+    process.env.NEON_DATABASE || details.databases?.[0]?.name || 'neondb';
+  const role =
+    process.env.NEON_ROLE || details.roles?.[0]?.name || 'neondb_owner';
+
+  const params = new URLSearchParams({
+    branch_id: branchId,
+    database_name: database,
+    role_name: role,
+    pooled: 'true',
+  });
+  const uriResult = await neonApi(
+    `/projects/${encodeURIComponent(projectId)}/connection_uri?${params.toString()}`,
+    apiKey
+  );
+  if (!uriResult.uri) throw new Error('Neon API returned no connection URI');
+
+  cachedConnectionString = uriResult.uri;
+  return cachedConnectionString;
+}
+
+async function getConnectionConfig() {
+  const connectionString = await getConnectionString();
   const url = new URL(connectionString);
   const endpointHost = url.hostname.replace(/^[^.]+/, 'api');
   return {
@@ -11,8 +78,7 @@ function getConnectionConfig() {
 }
 
 async function query(sql, params = []) {
-  const config = getConnectionConfig();
-  if (!config) throw new Error('DATABASE_URL is not configured');
+  const config = await getConnectionConfig();
 
   const response = await fetch(config.endpoint, {
     method: 'POST',
@@ -69,7 +135,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'invalid_code' });
   }
 
-  if (!process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith('REPLACE_')) {
+  const hasDirectUrl =
+    process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('REPLACE_');
+  if (!hasDirectUrl && !process.env.NEON_API_KEY) {
     return res.status(503).json({ error: 'database_not_configured' });
   }
 
@@ -90,8 +158,9 @@ export default async function handler(req, res) {
       if (rows.length === 0) {
         return res.status(404).json({ error: 'not_found' });
       }
+      const stored = rows[0].payload;
       return res.status(200).json({
-        payload: JSON.parse(rows[0].payload),
+        payload: typeof stored === 'string' ? JSON.parse(stored) : stored,
         updatedAt: rows[0].updated_at,
       });
     }

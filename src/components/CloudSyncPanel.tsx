@@ -18,7 +18,7 @@ import {
 
 const API_URL =
   import.meta.env.VITE_SYNC_API_URL ||
-  'https://bill-voucher-sync-azahar4bd-5195.vercel.app';
+  'https://bill-voucher-bkf.vercel.app';
 const SYNC_CODE_KEY = 'billVoucherSyncCode';
 
 const STORAGE_KEYS = [
