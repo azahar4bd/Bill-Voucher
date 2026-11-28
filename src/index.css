@@ -285,8 +285,21 @@
 /* =========================================================
    PRINT MEDIA RULES — 100% pure A4 output
    ========================================================= */
+/* Keep the print copy laid out at the printable A4 width so its text can be
+   measured before window.print(). display:none leaves every slot at zero width. */
 #print-portal {
-  display: none;
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 186mm; /* A4 width minus the 12mm page margins on each side */
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#print-portal .sonali-sheet {
+  width: 100%;
+  min-height: auto;
+  padding: 0;
 }
 
 .sheet-a4-portrait {
@@ -334,8 +347,23 @@
   }
 
   #print-portal {
-    display: block !important;
+    position: static !important;
     width: 100% !important;
+    visibility: visible !important;
+    pointer-events: auto;
+  }
+
+  /* Print engines can change the available width without allowing React to
+     refit in time. Let every value wrap rather than hide any of its text. */
+  .sonali-slot {
+    overflow: visible !important;
+  }
+
+  .sonali-val {
+    max-width: 100%;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word !important;
   }
 
   .sonali-sheet,
