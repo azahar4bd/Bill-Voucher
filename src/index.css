@@ -338,6 +338,13 @@
   margin: 8mm 9mm;
 }
 
+/* The scanned Sonali forms have wide blank side margins. Use more of A4 for
+   these forms only; the other sheets keep their existing page settings. */
+@page sonali-template-page {
+  size: A4 portrait;
+  margin: 5mm;
+}
+
 @media print {
   html,
   body {
@@ -357,6 +364,23 @@
     width: 100% !important;
     visibility: visible !important;
     pointer-events: auto;
+  }
+
+  #print-portal.sonali-print-portal {
+    page: sonali-template-page;
+  }
+
+  /* Trim only 28pt of empty space from either side of the 612pt template.
+     This leaves the entire form intact and enlarges it on the A4 page. */
+  .sonali-print-crop {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .sonali-print-crop .sonali-template-print {
+    width: 110.071943%; /* 612 / (612 - 2 × 28) */
+    max-width: none;
+    margin-left: -5.035971%; /* 28 / (612 - 2 × 28) */
   }
 
   /* Print engines can change the available width without allowing React to
