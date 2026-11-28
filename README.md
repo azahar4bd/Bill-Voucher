@@ -19,6 +19,12 @@ npm run build
 
 The static output is written to `dist/`.
 
+## BEFTN and RTGS original PDF forms
+
+The bundled templates in `public/templates/` are one-page working copies of the user's supplied `HO All Fund.pdf`: BEFTN page 1 and RTGS page 4. Existing FreeText annotations containing the old example data were removed from these copies; the underlying scanned form artwork and its original 612 × 792 pt page size are retained. The supplied PDF itself is not modified. Current entry data is drawn on a fresh copy in the browser; the downloadable PDF retains the original page dimensions. Preview and browser printing render that same PDF, and the browser scales the print image to the printable A4 area. The print path is rasterized; use the downloaded PDF for the original-resolution form.
+
+Coordinates are defined in `src/utils/sonaliTemplatePdf.ts` and apply only to these specific templates. Very long values are reduced in size to fit their original blanks. `public/fonts/HindSiliguri-Regular.ttf` is used for Bengali field values under the accompanying SIL Open Font License. Run `npm test` to verify generated PDFs, field content, long values, and Bengali font embedding.
+
 ## Deployment
 
 `.github/workflows/deploy-pages.yml` builds the app with `npm ci && npm run build` and publishes `dist/` to GitHub Pages on every push to `main` (and the active `arena/bb56c203-bill-voucher` branch).
