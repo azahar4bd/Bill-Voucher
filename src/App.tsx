@@ -25,7 +25,7 @@ import {
   MonthlyVoucherSheet,
 } from './components/MonthlyVoucherSheet';
 import { SearchableSelect } from './components/SearchableSelect';
-import { SonaliFormSheet } from './components/SonaliFormSheet';
+import { createSonaliTemplatePdf, downloadSonaliPdf, renderSonaliPdfPreview } from './utils/sonaliTemplatePdf';
 import {
   amountInWords,
   BankProfile,
@@ -64,7 +64,6 @@ import {
   generateBillPaymentPdf,
   generateMonthlyVoucherPdf,
 } from './utils/generateSheetsPdf';
-import { generateSonaliPdf } from './utils/generateSonaliPdf';
 
 function loadInitialProfiles(): BankProfile[] {
   try {
@@ -230,25 +229,36 @@ export function App() {
   });
 
   const challanCaptureRef = useRef<HTMLDivElement>(null);
-  const previewContainerRef = useRef<HTMLDivElement>(null);
-  const [previewScale, setPreviewScale] = useState<number>(0.72);
+  const [sonaliPreview, setSonaliPreview] = useState<{
+    key: string;
+    bytes: Uint8Array;
+    image: string;
+  } | null>(null);
+  const [sonaliError, setSonaliError] = useState('');
+  const isSonali = activePage === 'BEFTN' || activePage === 'RTGS';
+  const sonaliKey = JSON.stringify([formType, sender, receiver]);
+  const sonaliReady = sonaliPreview?.key === sonaliKey;
 
   useEffect(() => {
-    const el = previewContainerRef.current;
-    if (!el) return;
-
-    const updateScale = () => {
-      const availableWidth = el.clientWidth - 32;
-      const a4WidthPx = 794;
-      const nextScale = Math.min(1, Math.max(0.35, availableWidth / a4WidthPx));
-      setPreviewScale(nextScale);
+    if (!isSonali) return;
+    let cancelled = false;
+    setSonaliError('');
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const bytes = await createSonaliTemplatePdf(formType, sender, receiver);
+          const image = await renderSonaliPdfPreview(bytes);
+          if (!cancelled) setSonaliPreview({ key: sonaliKey, bytes, image });
+        } catch (error) {
+          if (!cancelled) setSonaliError(error instanceof Error ? error.message : 'PDF প্রিভিউ তৈরি করা যায়নি।');
+        }
+      })();
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
     };
-
-    updateScale();
-    const ro = new ResizeObserver(updateScale);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [mobileTab, activePage]);
+  }, [isSonali, sonaliKey]);
 
   useEffect(() => {
     if (!toast) return;
@@ -566,11 +576,15 @@ export function App() {
       return;
     }
 
-    generateSonaliPdf(formType, sender, receiver);
+    if (!sonaliReady || !sonaliPreview) {
+      showToast(sonaliError || 'PDF প্রস্তুত হচ্ছে, একটু অপেক্ষা করুন।', 'warning');
+      return;
+    }
+    downloadSonaliPdf(sonaliPreview.bytes, formType);
     if (!sender.amount.trim()) {
       showToast('PDF ডাউনলোড হয়েছে (Amount খালি ছিল)', 'warning');
     } else {
-      showToast(`${formType} A4 PDF ডাউনলোড হয়েছে!`);
+      showToast(`${formType} মূল ফর্মের PDF ডাউনলোড হয়েছে!`);
     }
   };
 
@@ -583,6 +597,10 @@ export function App() {
   };
 
   const handlePrint = () => {
+    if (isSonali && !sonaliReady) {
+      showToast(sonaliError || 'PDF প্রস্তুত হচ্ছে, একটু অপেক্ষা করুন।', 'warning');
+      return;
+    }
     const inIframe = (() => {
       try {
         return window.self !== window.top;
@@ -604,7 +622,7 @@ export function App() {
         showToast('PDF তৈরি করতে সমস্যা হয়েছে।', 'error');
       });
       showToast(
-        'প্রিভিউ ফ্রেমে সরাসরি Print সীমিত থাকায় A4 PDF ডাউনলোড করা হয়েছে — ফাইলটি ওপেন করে প্রিন্ট করুন।',
+        'প্রিভিউ ফ্রেমে সরাসরি Print সীমিত থাকায় PDF ডাউনলোড করা হয়েছে — ফাইলটি ওপেন করে প্রিন্ট করুন।',
         'warning'
       );
     }
@@ -806,7 +824,7 @@ export function App() {
                   : 'text-[#47554E] hover:text-[#131C18]'
               }`}
             >
-              A4 Preview
+              PDF Preview
             </button>
           </div>
 
@@ -1343,52 +1361,25 @@ export function App() {
                   </button>
                 </div>
                 <span className="text-xs text-[#5B6962]">
-                  &quot;Save as PDF&quot; চাপলে সরাসরি A4 PDF ফাইল ডাউনলোড হবে।
+                  মূল ফর্ম অপরিবর্তিত রেখে তথ্যসহ নতুন PDF তৈরি হবে।
                 </span>
               </div>
             </section>
           </div>
 
-          {/* Right Column: Live A4 Print Layout Preview */}
-          <div
-            ref={previewContainerRef}
-            className={`xl:col-span-6 ${
-              mobileTab === 'editor' ? 'hidden xl:block' : 'block'
-            }`}
-          >
+          {/* Preview is rendered from exactly the same PDF used for download. */}
+          <div className={`xl:col-span-6 ${mobileTab === 'editor' ? 'hidden xl:block' : 'block'}`}>
             <div className="bg-white border border-[#DCE3DF] rounded-lg overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-[#EAEFEF] flex items-center justify-between bg-[#FAFBFA]">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#131C18]">
-                  <FileText className="w-4 h-4 text-[#006633]" />
-                  <span>Live A4 Print Preview ({formType})</span>
-                </div>
-                <span className="text-xs font-mono-tabular text-[#5B6962]">
-                  A4 · {Math.round(previewScale * 100)}%
-                </span>
+              <div className="px-4 py-2.5 border-b border-[#EAEFEF] flex items-center gap-2 bg-[#FAFBFA] text-xs font-semibold text-[#131C18]">
+                <FileText className="w-4 h-4 text-[#006633]" />
+                <span>মূল PDF প্রিভিউ ({formType})</span>
               </div>
-
-              <div className="bg-[#E3E8E5] p-4 flex justify-center overflow-x-auto">
-                <div
-                  style={{
-                    width: `${794 * previewScale}px`,
-                    height: `${1123 * previewScale}px`,
-                    position: 'relative',
-                  }}
-                >
-                  <div
-                    className="origin-top-left shadow-md"
-                    style={{
-                      width: '210mm',
-                      transform: `scale(${previewScale})`,
-                    }}
-                  >
-                    <SonaliFormSheet
-                      formType={formType}
-                      sender={sender}
-                      receiver={receiver}
-                    />
-                  </div>
-                </div>
+              <div className="bg-[#E3E8E5] p-4 flex justify-center">
+                {sonaliReady && sonaliPreview ? (
+                  <img src={sonaliPreview.image} alt={`${formType} মূল PDF প্রিভিউ`} className="w-full max-w-[816px] h-auto shadow-md bg-white" />
+                ) : (
+                  <p role="status" className="py-8 text-sm text-[#47554E]">{sonaliError || 'PDF প্রিভিউ তৈরি হচ্ছে…'}</p>
+                )}
               </div>
             </div>
           </div>
@@ -1483,8 +1474,8 @@ export function App() {
             monthlyVoucherData={monthlyVoucherData}
           />
         )}
-        {(activePage === 'BEFTN' || activePage === 'RTGS') && (
-          <SonaliFormSheet formType={formType} sender={sender} receiver={receiver} />
+        {isSonali && sonaliReady && sonaliPreview && (
+          <img className="sonali-template-print" src={sonaliPreview.image} alt={`${formType} ফর্ম`} />
         )}
       </div>
     </>

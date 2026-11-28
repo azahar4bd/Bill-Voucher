@@ -302,6 +302,12 @@
   padding: 0;
 }
 
+.sonali-template-print {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .sheet-a4-portrait {
   width: 210mm;
   min-height: 297mm;
