@@ -1,4 +1,4 @@
-import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFPage, PageSizes, StandardFonts, rgb } from 'pdf-lib';
 import { FormType, ReceiverFormData, SenderFormData } from '../data/bankDefaults';
 
 // Coordinates are in PDF points, measured from the top-left of the supplied
@@ -163,6 +163,31 @@ export async function createSonaliTemplatePdf(
     throw new Error('কিছু অক্ষর PDF ফর্মে সমর্থিত নয়। বাংলা বা ইংরেজি অক্ষর ও সংখ্যা ব্যবহার করুন।');
   }
   return pdf.save();
+}
+
+// The direct print layout trims 28pt of blank margin on each side and fits the
+// remainder on A4 with 5mm margins. Match it for downloads so the saved copy
+// prints at the same larger size. The original template remains unchanged.
+export async function createSonaliPrintPdf(bytes: Uint8Array): Promise<Uint8Array> {
+  const source = await PDFDocument.load(bytes);
+  const output = await PDFDocument.create();
+  const form = await output.embedPage(source.getPage(0), {
+    left: 28,
+    right: 584,
+    bottom: 0,
+    top: 792,
+  });
+  const [width, height] = PageSizes.A4;
+  const margin = 5 * 72 / 25.4;
+  const scale = Math.min((width - 2 * margin) / form.width, (height - 2 * margin) / form.height);
+  const page = output.addPage(PageSizes.A4);
+  page.drawPage(form, {
+    x: (width - form.width * scale) / 2,
+    y: height - margin - form.height * scale,
+    width: form.width * scale,
+    height: form.height * scale,
+  });
+  return output.save();
 }
 
 export async function renderSonaliPdfPreview(bytes: Uint8Array): Promise<string> {

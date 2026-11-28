@@ -27,7 +27,7 @@ test('original template PDF overlays preserve all entries for both forms', async
     return new Response(data);
   };
   try {
-    const { createSonaliTemplatePdf } = await server.ssrLoadModule('/src/utils/sonaliTemplatePdf.ts');
+    const { createSonaliTemplatePdf, createSonaliPrintPdf } = await server.ssrLoadModule('/src/utils/sonaliTemplatePdf.ts');
     for (const form of ['BEFTN', 'RTGS']) {
       const result = await createSonaliTemplatePdf(form, sender, receiver);
       const pdf = await PDFDocument.load(result);
@@ -42,6 +42,27 @@ test('original template PDF overlays preserve all entries for both forms', async
         assert.ok(text.includes(value), `${form} is missing ${value}`);
       }
       assert.equal((await page.getAnnotations()).length, 0);
+
+      // The iframe print fallback is a separate A4 copy with blank side margins
+      // trimmed. All form fields remain present and larger than before.
+      const printBytes = await createSonaliPrintPdf(result);
+      assert.deepEqual(pdf.getPage(0).getSize(), { width: 612, height: 792 });
+      const printable = await PDFDocument.load(printBytes);
+      const size = printable.getPage(0).getSize();
+      assert.equal(printable.getPageCount(), 1);
+      assert.ok(Math.abs(size.width - 595.28) < 0.1 && Math.abs(size.height - 841.89) < 0.1);
+      const printDoc = await getDocument({ data: printBytes.slice(), useSystemFonts: false }).promise;
+      const printPage = await printDoc.getPage(1);
+      const printItems = (await printPage.getTextContent()).items;
+      const printText = printItems.map((item) => item.str).join(' ');
+      for (const value of ['125614/-', sender.amountWords, receiver.receivingBank, receiver.receiverAccountNumber]) {
+        assert.ok(printText.includes(value), `${form} print PDF is missing ${value}`);
+      }
+      const originalItem = contents.items.find((item) => item.str === sender.accountNumber);
+      const printItem = printItems.find((item) => item.str === sender.accountNumber);
+      assert.ok(printItem.width > originalItem.width * 0.98, 'print copy must keep text near original size');
+      assert.ok(printItem.transform[4] >= 14 && printItem.transform[4] + printItem.width <= size.width - 14);
+      await printDoc.destroy();
       await pdfjs.destroy();
     }
     const longWords = 'One Hundred Twenty Three Crore Forty Five Lakh Sixty Seven Thousand Eight Hundred Ninety Taka Only '.repeat(4).trim();

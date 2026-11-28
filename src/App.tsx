@@ -25,7 +25,7 @@ import {
   MonthlyVoucherSheet,
 } from './components/MonthlyVoucherSheet';
 import { SearchableSelect } from './components/SearchableSelect';
-import { createSonaliTemplatePdf, downloadSonaliPdf, renderSonaliPdfPreview } from './utils/sonaliTemplatePdf';
+import { createSonaliPrintPdf, createSonaliTemplatePdf, downloadSonaliPdf, renderSonaliPdfPreview } from './utils/sonaliTemplatePdf';
 import {
   amountInWords,
   BankProfile,
@@ -580,7 +580,8 @@ export function App() {
       showToast(sonaliError || 'PDF প্রস্তুত হচ্ছে, একটু অপেক্ষা করুন।', 'warning');
       return;
     }
-    downloadSonaliPdf(sonaliPreview.bytes, formType);
+    // Also use the larger A4 layout when the saved PDF is printed later.
+    downloadSonaliPdf(await createSonaliPrintPdf(sonaliPreview.bytes), formType);
     if (!sender.amount.trim()) {
       showToast('PDF ডাউনলোড হয়েছে (Amount খালি ছিল)', 'warning');
     } else {
@@ -1452,7 +1453,7 @@ export function App() {
       )}
 
       {/* Dedicated A4 Print Portal (visible only during @media print) */}
-      <div id="print-portal">
+      <div id="print-portal" className={isSonali ? 'sonali-print-portal' : undefined}>
         {activePage === 'BILL_PAYMENT' && <BillPaymentPrintView data={billPaymentData} />}
         {activePage === 'BANK_TRANSFER' && (
           <BankTransferPrintView data={bankTransferData} />
@@ -1475,7 +1476,9 @@ export function App() {
           />
         )}
         {isSonali && sonaliReady && sonaliPreview && (
-          <img className="sonali-template-print" src={sonaliPreview.image} alt={`${formType} ফর্ম`} />
+          <div className="sonali-print-crop">
+            <img className="sonali-template-print" src={sonaliPreview.image} alt={`${formType} ফর্ম`} />
+          </div>
         )}
       </div>
     </>
